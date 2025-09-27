@@ -16,14 +16,14 @@ stages:
               versionSpec: '18.x'
 
           - script: |
-              cd backend
+              cd coffehub/backend
               npm install
               npm test
             displayName: "Install & Test Backend"
 
           - task: PublishBuildArtifacts@1
             inputs:
-              PathtoPublish: 'backend'
+              PathtoPublish: 'coffehub/backend'
               ArtifactName: 'backend'
               publishLocation: 'Container'
             displayName: "Publicar artefacto Backend"
@@ -36,14 +36,14 @@ stages:
               versionSpec: '18.x'
 
           - script: |
-              cd frontend
+              cd coffehub/frontend
               npm install || true
               npm run build || echo "No build script definido"
             displayName: "Build Frontend"
 
           - task: PublishBuildArtifacts@1
             inputs:
-              PathtoPublish: 'frontend'
+              PathtoPublish: 'coffehub/frontend'
               ArtifactName: 'frontend'
               publishLocation: 'Container'
             displayName: "Publicar artefacto Frontend"
