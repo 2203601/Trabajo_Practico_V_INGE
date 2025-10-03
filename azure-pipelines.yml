@@ -1,7 +1,5 @@
 trigger:
-  branches:
-      include:
-      - main
+  - main
 
 pool:
   name: SelfHosted
@@ -25,17 +23,14 @@ variables:
       displayName: "Backend CI"
       steps:
         - checkout: self
-
         - task: NodeTool@0
           inputs:
             versionSpec: '18.x'
           displayName: "Usar Node.js 18.x"
-
         - script: |
             cd coffehub/backend
             npm install
           displayName: "Install Backend"
-
         - task: PublishBuildArtifacts@1
           inputs:
             PathtoPublish: 'coffehub/backend'
@@ -47,18 +42,15 @@ variables:
       displayName: "Frontend CI"
       steps:
         - checkout: self
-
         - task: NodeTool@0
           inputs:
             versionSpec: '18.x'
           displayName: "Usar Node.js 18.x"
-
         - script: |
             cd coffehub/frontend
             npm install || true
             npm run build || echo "No build script definido"
           displayName: "Build Frontend"
-
         - task: PublishBuildArtifacts@1
           inputs:
             PathtoPublish: 'coffehub/frontend'
@@ -114,7 +106,7 @@ variables:
   condition: succeeded()
   jobs:
     - deployment: DeployBackendProd
-      environment: PROD   # ⚠️ configurar aprobación manual en DevOps UI
+      environment: PROD
       strategy:
         runOnce:
           deploy:
@@ -130,7 +122,7 @@ variables:
                 displayName: "Health Check Backend PROD"
 
     - deployment: DeployFrontendProd
-      environment: PROD   # ⚠️ configurar aprobación manual en DevOps UI
+      environment: PROD
       strategy:
         runOnce:
           deploy:
