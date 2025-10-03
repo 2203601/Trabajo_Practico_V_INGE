@@ -6,14 +6,13 @@ pool:
 
 variables:
   # ===== QA URLs =====
-  backendQAUrl: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net.azurewebsites.net/health"
-  frontendQAUrl: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net.azurewebsites.net"
+  backendQAUrl: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net/health"
+  frontendQAUrl: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net/health"
 
   # ===== PROD URLs =====
-  backendProdUrl: "https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net"
-  frontendProdUrl: "https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net"
+  backendProdUrl: "https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net/health"
+  frontendProdUrl: "https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net/health"
 
-stages:
 # =========================
 # STAGE 1 - CI (Build)
 # =========================
