@@ -2,17 +2,20 @@ trigger:
   branches:
     include:
     - main
+
 pool:
   name: SelfHosted
+
 variables:
 - name: backendQAUrl
-  value: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net.azurewebsites.net/health"
+  value: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net.azurewebsites.net"
 - name: frontendQAUrl
-  value: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net.azurewebsites.net"
+  value: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net"
 - name: backendProdUrl
   value: "https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net"
 - name: frontendProdUrl
   value: "https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net"
+
 stages:
 - stage: CI
   displayName: "Continuous Integration"
