@@ -11,56 +11,53 @@ stages:
 - stage: CI
   displayName: "Continuous Integration"
   jobs:
-    - job: DebugAndBuild
-      displayName: "Debug + Build"
+    - job: Backend
+      displayName: "Backend CI"
       steps:
-        # Checkout del repo
         - checkout: self
 
-        # Debug de carpetas
-        - script: pwd
-          displayName: "Mostrar directorio actual"
-
-        - script: ls -la
-          displayName: "Listar contenido raíz"
-
-        - script: ls -R | head -n 300
-          displayName: "Listar primeros 300 archivos/carpetas"
-
-        # ==== Backend CI ====
         - task: NodeTool@0
           inputs:
             versionSpec: '18.x'
           displayName: "Usar Node.js 18.x"
 
         - script: |
-            cd tp5/coffehub/backend || cd coffehub/backend || cd backend
+            cd coffehub/backend
             npm install
-          displayName: "Install Backend (ruta flexible)"
+          displayName: "Install Backend"
 
         - script: |
-            cd tp5/coffehub/backend || cd coffehub/backend || cd backend
+            cd coffehub/backend
             npm test || echo "Tests skipped (no DB available)"
           displayName: "Run Backend Tests"
           continueOnError: true
 
         - task: PublishBuildArtifacts@1
           inputs:
-            PathtoPublish: 'tp5/coffehub/backend'
+            PathtoPublish: 'coffehub/backend'
             ArtifactName: 'backend'
             publishLocation: 'Container'
           displayName: "Publicar artefacto Backend"
 
-        # ==== Frontend CI ====
+    - job: Frontend
+      displayName: "Frontend CI"
+      steps:
+        - checkout: self
+
+        - task: NodeTool@0
+          inputs:
+            versionSpec: '18.x'
+          displayName: "Usar Node.js 18.x"
+
         - script: |
-            cd tp5/coffehub/frontend || cd coffehub/frontend || cd frontend
-            npm install
+            cd coffehub/frontend
+            npm install || true
             npm run build || echo "No build script definido"
           displayName: "Build Frontend"
 
         - task: PublishBuildArtifacts@1
           inputs:
-            PathtoPublish: 'tp5/coffehub/frontend'
+            PathtoPublish: 'coffehub/frontend'
             ArtifactName: 'frontend'
             publishLocation: 'Container'
           displayName: "Publicar artefacto Frontend"
