@@ -25,19 +25,19 @@ stages:
             versionSpec: '18.x'
 
         - script: |
-            cd tp5/coffehub/backend
+            cd coffehub/backend
             npm install
           displayName: "Install Backend"
 
         - script: |
-            cd tp5/coffehub/backend
+            cd coffehub/backend
             npm test || echo "Tests skipped (no DB available)"
           displayName: "Run Backend Tests (Optional)"
           continueOnError: true
 
         - task: PublishBuildArtifacts@1
           inputs:
-            PathtoPublish: 'tp5/coffehub/backend'
+            PathtoPublish: 'coffehub/backend'
             ArtifactName: 'backend'
             publishLocation: 'Container'
           displayName: "Publicar artefacto Backend"
@@ -57,7 +57,7 @@ stages:
 
         - task: PublishBuildArtifacts@1
           inputs:
-            PathtoPublish: 'tp5/coffehub/frontend'
+            PathtoPublish: 'coffehub/frontend'
             ArtifactName: 'frontend'
             publishLocation: 'Container'
           displayName: "Publicar artefacto Frontend"
