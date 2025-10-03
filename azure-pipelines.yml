@@ -16,6 +16,7 @@ stages:
 - stage: CI
   displayName: "Continuous Integration"
   jobs:
+    # Backend CI
     - job: Backend
       displayName: "Backend CI"
       steps:
@@ -30,16 +31,23 @@ stages:
 
         - script: |
             cd coffehub/backend
-            npm test || echo "Tests skipped (no DB available)"
+            npm test
           displayName: "Run Backend Tests (Optional)"
           continueOnError: true
 
+        - script: |
+            cd coffehub/backend
+            echo "Listing backend directory:"
+            ls -la
+          displayName: "Debug Backend Directory"
+
         - task: PublishPipelineArtifact@1
           inputs:
-            targetPath: 'coffehub/backend/dist'
+            targetPath: 'coffehub/backend/dist'   # Ajusta según tu backend build
             artifact: 'backend'
           displayName: "Publish Backend Artifact"
 
+    # Frontend CI
     - job: Frontend
       displayName: "Frontend CI"
       steps:
@@ -49,13 +57,19 @@ stages:
 
         - script: |
             cd coffehub/frontend
-            npm install || true
-            npm run build || echo "No build script definido"
+            npm install
+            npm run build
           displayName: "Build Frontend"
+
+        - script: |
+            cd coffehub/frontend
+            echo "Listing frontend directory after build:"
+            ls -la
+          displayName: "Debug Frontend Directory"
 
         - task: PublishPipelineArtifact@1
           inputs:
-            targetPath: 'coffehub/frontend/build'
+            targetPath: 'coffehub/frontend/build'  # Ajusta si tu build genera otra carpeta (dist, etc.)
             artifact: 'frontend'
           displayName: "Publish Frontend Artifact"
 
@@ -72,7 +86,6 @@ stages:
         runOnce:
           deploy:
             steps:
-              # Usamos artifacts directamente desde CI
               - download: current
                 artifact: backend
                 displayName: "Get Backend Artifact"
