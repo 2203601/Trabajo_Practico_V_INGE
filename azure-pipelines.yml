@@ -4,13 +4,12 @@ trigger:
 pool:
   name: SelfHosted
 
-
 variables:
-  azureSubscription: 'azure-tp05-connection'   # nombre de tu Service Connection en DevOps
-  backendQA: 'coffehub-Backend-QA'
-  frontendQA: 'coffehub-Front-QA'
-  backendPROD: 'coffehub-Backend-PROD'
-  frontendPROD: 'coffehub-Front-PROD'
+  azureSubscription: 'azure-tp05-connection'
+  backendQA: 'CoffeeHub-Back-QA'
+  frontendQA: 'CoffeeHub-Front-QA'
+  backendPROD: 'CoffeeHub-Back-Prod'
+  frontendPROD: 'CoffeeHub-Front-Prod'
 
 stages:
 # ---------------- CI ----------------
@@ -35,12 +34,11 @@ stages:
           displayName: "Run Backend Tests (Optional)"
           continueOnError: true
 
-        - task: PublishBuildArtifacts@1
+        - task: PublishPipelineArtifact@1
           inputs:
-            PathtoPublish: 'coffehub/backend'
-            ArtifactName: 'backend'
-            publishLocation: 'Container'
-          displayName: "Publicar artefacto Backend"
+            targetPath: 'coffehub/backend/dist'
+            artifact: 'backend'
+          displayName: "Publish Backend Artifact"
 
     - job: Frontend
       displayName: "Frontend CI"
@@ -50,17 +48,16 @@ stages:
             versionSpec: '18.x'
 
         - script: |
-            cd tp5/coffehub/frontend
+            cd coffehub/frontend
             npm install || true
             npm run build || echo "No build script definido"
           displayName: "Build Frontend"
 
-        - task: PublishBuildArtifacts@1
+        - task: PublishPipelineArtifact@1
           inputs:
-            PathtoPublish: 'coffehub/frontend'
-            ArtifactName: 'frontend'
-            publishLocation: 'Container'
-          displayName: "Publicar artefacto Frontend"
+            targetPath: 'coffehub/frontend/build'
+            artifact: 'frontend'
+          displayName: "Publish Frontend Artifact"
 
 # ---------------- QA ----------------
 - stage: DeployQA
@@ -75,15 +72,14 @@ stages:
         runOnce:
           deploy:
             steps:
-              - task: DownloadBuildArtifacts@0
-                inputs:
-                  artifactName: 'backend'
-                  downloadPath: '$(Pipeline.Workspace)/backend'
+              # Usamos artifacts directamente desde CI
+              - download: current
+                artifact: backend
+                displayName: "Get Backend Artifact"
 
-              - task: DownloadBuildArtifacts@0
-                inputs:
-                  artifactName: 'frontend'
-                  downloadPath: '$(Pipeline.Workspace)/frontend'
+              - download: current
+                artifact: frontend
+                displayName: "Get Frontend Artifact"
 
               - task: AzureWebApp@1
                 displayName: "Deploy Backend to QA"
@@ -114,15 +110,13 @@ stages:
         runOnce:
           deploy:
             steps:
-              - task: DownloadBuildArtifacts@0
-                inputs:
-                  artifactName: 'backend'
-                  downloadPath: '$(Pipeline.Workspace)/backend'
+              - download: current
+                artifact: backend
+                displayName: "Get Backend Artifact"
 
-              - task: DownloadBuildArtifacts@0
-                inputs:
-                  artifactName: 'frontend'
-                  downloadPath: '$(Pipeline.Workspace)/frontend'
+              - download: current
+                artifact: frontend
+                displayName: "Get Frontend Artifact"
 
               - task: AzureWebApp@1
                 displayName: "Deploy Backend to PROD"
