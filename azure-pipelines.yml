@@ -8,7 +8,7 @@ pool:
 
 variables:
 - name: backendQAUrl
-  value: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net.azurewebsites.net"
+  value: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites."
 - name: frontendQAUrl
   value: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net"
 - name: backendProdUrl
