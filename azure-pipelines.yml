@@ -8,11 +8,11 @@ pool:
 
 variables:
 - name: backendQAUrl
-  value: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net"
+  value: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net/health"
 - name: frontendQAUrl
   value: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net"
 - name: backendProdUrl
-  value: "https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net"
+  value: "https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net/health"
 - name: frontendProdUrl
   value: "https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net"
 
@@ -65,6 +65,7 @@ stages:
         ArtifactName: 'frontend'
         publishLocation: 'Container'
       displayName: "Publicar artefacto Frontend"
+
 - stage: QA
   displayName: "Deploy QA"
   dependsOn:
@@ -90,6 +91,7 @@ stages:
             displayName: "Health Check Backend QA"
             inputs:
               script: curl -f $(backendQAUrl) || exit 1
+
   - deployment: DeployFrontendQA
     environment:
       name: QA
@@ -110,6 +112,7 @@ stages:
             displayName: "Health Check Frontend QA"
             inputs:
               script: curl -f $(frontendQAUrl) || exit 1
+
 - stage: PROD
   displayName: "Deploy Production"
   dependsOn:
@@ -136,6 +139,7 @@ stages:
             displayName: "Health Check Backend PROD"
             inputs:
               script: curl -f $(backendProdUrl) || exit 1
+
   - deployment: DeployFrontendProd
     environment:
       name: PROD
