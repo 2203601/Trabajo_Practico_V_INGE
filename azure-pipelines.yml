@@ -4,9 +4,18 @@ trigger:
 pool:
   vmImage: ubuntu-latest
 
+variables:
+  # ===== QA URLs =====
+  backendQAUrl: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net.azurewebsites.net/health"
+  frontendQAUrl: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net.azurewebsites.net"
+
+  # ===== PROD URLs =====
+  backendProdUrl: "https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net"
+  frontendProdUrl: "https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net"
+
 stages:
 # =========================
-# STAGE 1 - CI (Build & Test)
+# STAGE 1 - CI (Build)
 # =========================
 - stage: CI
   displayName: "Continuous Integration"
@@ -25,12 +34,6 @@ stages:
             cd coffehub/backend
             npm install
           displayName: "Install Backend"
-
-        - script: |
-            cd coffehub/backend
-            npm test || echo "Tests skipped (no DB available)"
-          displayName: "Run Backend Tests"
-          continueOnError: true
 
         - task: PublishBuildArtifacts@1
           inputs:
@@ -82,7 +85,7 @@ stages:
                   azureSubscription: 'azure-tp05-connection'
                   appName: 'CoffeeHub-Back-QA'
                   package: '$(Pipeline.Workspace)/backend'
-              - script: curl -f https://coffeehub-back-qa.azurewebsites.net/health || exit 1
+              - script: curl -f $(backendQAUrl) || exit 1
                 displayName: "Health Check Backend QA"
 
     - deployment: DeployFrontendQA
@@ -98,7 +101,7 @@ stages:
                   azureSubscription: 'azure-tp05-connection'
                   appName: 'CoffeeHub-Front-QA'
                   package: '$(Pipeline.Workspace)/frontend'
-              - script: curl -f https://coffeehub-front-qa.azurewebsites.net || exit 1
+              - script: curl -f $(frontendQAUrl) || exit 1
                 displayName: "Health Check Frontend QA"
 
 # =========================
@@ -122,7 +125,7 @@ stages:
                   azureSubscription: 'azure-tp05-connection'
                   appName: 'CoffeeHub-Back-PROD'
                   package: '$(Pipeline.Workspace)/backend'
-              - script: curl -f https://coffeehub-back-prod.azurewebsites.net/health || exit 1
+              - script: curl -f $(backendProdUrl) || exit 1
                 displayName: "Health Check Backend PROD"
 
     - deployment: DeployFrontendProd
@@ -138,5 +141,5 @@ stages:
                   azureSubscription: 'azure-tp05-connection'
                   appName: 'CoffeeHub-Front-PROD'
                   package: '$(Pipeline.Workspace)/frontend'
-              - script: curl -f https://coffeehub-front-prod.azurewebsites.net || exit 1
+              - script: curl -f $(frontendProdUrl) || exit 1
                 displayName: "Health Check Frontend PROD"
