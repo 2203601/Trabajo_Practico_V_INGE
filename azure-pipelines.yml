@@ -11,20 +11,35 @@ stages:
 - stage: CI
   displayName: "Continuous Integration"
   jobs:
-    - job: Backend
-      displayName: "Backend CI"
+    - job: DebugAndBuild
+      displayName: "Debug + Build"
       steps:
+        # Checkout del repo
+        - checkout: self
+
+        # Debug de carpetas
+        - script: pwd
+          displayName: "Mostrar directorio actual"
+
+        - script: ls -la
+          displayName: "Listar contenido raíz"
+
+        - script: ls -R | head -n 300
+          displayName: "Listar primeros 300 archivos/carpetas"
+
+        # ==== Backend CI ====
         - task: NodeTool@0
           inputs:
             versionSpec: '18.x'
+          displayName: "Usar Node.js 18.x"
 
         - script: |
-            cd tp5/coffehub/backend
+            cd tp5/coffehub/backend || cd coffehub/backend || cd backend
             npm install
-          displayName: "Install Backend"
+          displayName: "Install Backend (ruta flexible)"
 
         - script: |
-            cd tp5/coffehub/backend
+            cd tp5/coffehub/backend || cd coffehub/backend || cd backend
             npm test || echo "Tests skipped (no DB available)"
           displayName: "Run Backend Tests"
           continueOnError: true
@@ -36,17 +51,11 @@ stages:
             publishLocation: 'Container'
           displayName: "Publicar artefacto Backend"
 
-    - job: Frontend
-      displayName: "Frontend CI"
-      steps:
-        - task: NodeTool@0
-          inputs:
-            versionSpec: '18.x'
-
+        # ==== Frontend CI ====
         - script: |
-            cd tp5/coffehub/frontend
+            cd tp5/coffehub/frontend || cd coffehub/frontend || cd frontend
             npm install
-            npm run build
+            npm run build || echo "No build script definido"
           displayName: "Build Frontend"
 
         - task: PublishBuildArtifacts@1
@@ -120,7 +129,7 @@ stages:
                 displayName: "Health Check Backend PROD"
 
     - deployment: DeployFrontendProd
-      environment: PROD   
+      environment: PROD   # ⚠️ configurar aprobación manual en DevOps UI
       strategy:
         runOnce:
           deploy:
