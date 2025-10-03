@@ -1,142 +1,155 @@
 trigger:
-  - main
-
+  branches:
+    include:
+    - main
 pool:
   name: SelfHosted
-
 variables:
-  # ===== QA URLs =====
-  backendQAUrl: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net/health"
-  frontendQAUrl: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net/health"
-
-  # ===== PROD URLs =====
-  backendProdUrl: "https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net/health"
-  frontendProdUrl: "https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net/health"
-
-# =========================
-# STAGE 1 - CI (Build)
-# =========================
+- name: backendQAUrl
+  value: "https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net.azurewebsites.net/health"
+- name: frontendQAUrl
+  value: "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net.azurewebsites.net"
+- name: backendProdUrl
+  value: "https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net"
+- name: frontendProdUrl
+  value: "https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net"
+stages:
 - stage: CI
   displayName: "Continuous Integration"
   jobs:
-    - job: Backend
-      displayName: "Backend CI"
-      steps:
-        - checkout: self
-        - task: NodeTool@0
-          inputs:
-            versionSpec: '18.x'
-          displayName: "Usar Node.js 18.x"
-        - script: |
-            cd coffehub/backend
-            npm install
-          displayName: "Install Backend"
-        - task: PublishBuildArtifacts@1
-          inputs:
-            PathtoPublish: 'coffehub/backend'
-            ArtifactName: 'backend'
-            publishLocation: 'Container'
-          displayName: "Publicar artefacto Backend"
-
-    - job: Frontend
-      displayName: "Frontend CI"
-      steps:
-        - checkout: self
-        - task: NodeTool@0
-          inputs:
-            versionSpec: '18.x'
-          displayName: "Usar Node.js 18.x"
-        - script: |
-            cd coffehub/frontend
-            npm install || true
-            npm run build || echo "No build script definido"
-          displayName: "Build Frontend"
-        - task: PublishBuildArtifacts@1
-          inputs:
-            PathtoPublish: 'coffehub/frontend'
-            ArtifactName: 'frontend'
-            publishLocation: 'Container'
-          displayName: "Publicar artefacto Frontend"
-
-# =========================
-# STAGE 2 - Deploy QA
-# =========================
+  - job: Backend
+    displayName: "Backend CI"
+    steps:
+    - task: 6d15af64-176c-496d-b583-fd2ae21d4df4@1
+      inputs:
+        repository: self
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: "Usar Node.js 18.x"
+    - task: CmdLine@2
+      displayName: "Install Backend"
+      inputs:
+        script: |
+          cd coffehub/backend
+          npm install
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'coffehub/backend'
+        ArtifactName: 'backend'
+        publishLocation: 'Container'
+      displayName: "Publicar artefacto Backend"
+  - job: Frontend
+    displayName: "Frontend CI"
+    steps:
+    - task: 6d15af64-176c-496d-b583-fd2ae21d4df4@1
+      inputs:
+        repository: self
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: "Usar Node.js 18.x"
+    - task: CmdLine@2
+      displayName: "Build Frontend"
+      inputs:
+        script: |
+          cd coffehub/frontend
+          npm install || true
+          npm run build || echo "No build script definido"
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'coffehub/frontend'
+        ArtifactName: 'frontend'
+        publishLocation: 'Container'
+      displayName: "Publicar artefacto Frontend"
 - stage: QA
   displayName: "Deploy QA"
-  dependsOn: CI
+  dependsOn:
+  - CI
   jobs:
-    - deployment: DeployBackendQA
-      environment: QA
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - download: current
-                artifact: backend
-              - task: AzureWebApp@1
-                inputs:
-                  azureSubscription: 'azure-tp05-connection'
-                  appName: 'CoffeeHub-Back-QA'
-                  package: '$(Pipeline.Workspace)/backend'
-              - script: |
-                  curl -f $(backendQAUrl) || exit 1
-                displayName: "Health Check Backend QA"
-
-    - deployment: DeployFrontendQA
-      environment: QA
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - download: current
-                artifact: frontend
-              - task: AzureWebApp@1
-                inputs:
-                  azureSubscription: 'azure-tp05-connection'
-                  appName: 'CoffeeHub-Front-QA'
-                  package: '$(Pipeline.Workspace)/frontend'
-              - script: |
-                  curl -f $(frontendQAUrl) || exit 1
-                displayName: "Health Check Frontend QA"
-
-# =========================
-# STAGE 3 - Deploy PROD
-# =========================
+  - deployment: DeployBackendQA
+    environment:
+      name: QA
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: 30f35852-3f7e-4c0c-9a88-e127b4f97211@1
+            inputs:
+              alias: current
+              artifact: backend
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'azure-tp05-connection'
+              appName: 'CoffeeHub-Back-QA'
+              package: '$(Pipeline.Workspace)/backend'
+          - task: CmdLine@2
+            displayName: "Health Check Backend QA"
+            inputs:
+              script: curl -f $(backendQAUrl) || exit 1
+  - deployment: DeployFrontendQA
+    environment:
+      name: QA
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: 30f35852-3f7e-4c0c-9a88-e127b4f97211@1
+            inputs:
+              alias: current
+              artifact: frontend
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'azure-tp05-connection'
+              appName: 'CoffeeHub-Front-QA'
+              package: '$(Pipeline.Workspace)/frontend'
+          - task: CmdLine@2
+            displayName: "Health Check Frontend QA"
+            inputs:
+              script: curl -f $(frontendQAUrl) || exit 1
 - stage: PROD
   displayName: "Deploy Production"
-  dependsOn: QA
+  dependsOn:
+  - QA
   condition: succeeded()
   jobs:
-    - deployment: DeployBackendProd
-      environment: PROD
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - download: current
-                artifact: backend
-              - task: AzureWebApp@1
-                inputs:
-                  azureSubscription: 'azure-tp05-connection'
-                  appName: 'CoffeeHub-Back-PROD'
-                  package: '$(Pipeline.Workspace)/backend'
-              - script: |
-                  curl -f $(backendProdUrl) || exit 1
-                displayName: "Health Check Backend PROD"
-
-    - deployment: DeployFrontendProd
-      environment: PROD
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - download: current
-                artifact: frontend
-              - task: AzureWebApp@1
-                inputs:
-                  azureSubscription: 'azure-tp05-connection'
-                  appName: 'CoffeeHub-Front-PROD'
-                  package: '$(Pipeline.Workspace)/frontend'
-              - script: |
-                  curl -f $(frontendProdUrl) || exit 1
-                displayName: "Health Check Frontend PROD"
+  - deployment: DeployBackendProd
+    environment:
+      name: PROD
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: 30f35852-3f7e-4c0c-9a88-e127b4f97211@1
+            inputs:
+              alias: current
+              artifact: backend
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'azure-tp05-connection'
+              appName: 'CoffeeHub-Back-PROD'
+              package: '$(Pipeline.Workspace)/backend'
+          - task: CmdLine@2
+            displayName: "Health Check Backend PROD"
+            inputs:
+              script: curl -f $(backendProdUrl) || exit 1
+  - deployment: DeployFrontendProd
+    environment:
+      name: PROD
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: 30f35852-3f7e-4c0c-9a88-e127b4f97211@1
+            inputs:
+              alias: current
+              artifact: frontend
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'azure-tp05-connection'
+              appName: 'CoffeeHub-Front-PROD'
+              package: '$(Pipeline.Workspace)/frontend'
+          - task: CmdLine@2
+            displayName: "Health Check Frontend PROD"
+            inputs:
+              script: curl -f $(frontendProdUrl) || exit 1
