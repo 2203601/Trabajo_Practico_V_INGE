@@ -78,7 +78,8 @@ variables:
                   azureSubscription: 'azure-tp05-connection'
                   appName: 'CoffeeHub-Back-QA'
                   package: '$(Pipeline.Workspace)/backend'
-              - script: curl -f $(backendQAUrl) || exit 1
+              - script: |
+                  curl -f $(backendQAUrl) || exit 1
                 displayName: "Health Check Backend QA"
 
     - deployment: DeployFrontendQA
@@ -94,7 +95,8 @@ variables:
                   azureSubscription: 'azure-tp05-connection'
                   appName: 'CoffeeHub-Front-QA'
                   package: '$(Pipeline.Workspace)/frontend'
-              - script: curl -f $(frontendQAUrl) || exit 1
+              - script: |
+                  curl -f $(frontendQAUrl) || exit 1
                 displayName: "Health Check Frontend QA"
 
 # =========================
@@ -118,7 +120,8 @@ variables:
                   azureSubscription: 'azure-tp05-connection'
                   appName: 'CoffeeHub-Back-PROD'
                   package: '$(Pipeline.Workspace)/backend'
-              - script: curl -f $(backendProdUrl) || exit 1
+              - script: |
+                  curl -f $(backendProdUrl) || exit 1
                 displayName: "Health Check Backend PROD"
 
     - deployment: DeployFrontendProd
@@ -134,5 +137,6 @@ variables:
                   azureSubscription: 'azure-tp05-connection'
                   appName: 'CoffeeHub-Front-PROD'
                   package: '$(Pipeline.Workspace)/frontend'
-              - script: curl -f $(frontendProdUrl) || exit 1
+              - script: |
+                  curl -f $(frontendProdUrl) || exit 1
                 displayName: "Health Check Frontend PROD"
