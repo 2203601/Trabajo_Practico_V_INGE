@@ -1,10 +1,9 @@
 const express = require("express");
 const cors = require("cors");
-const mysql = require("mysql2");
+const sqlite3 = require('sqlite3').verbose();
 const path = require("path");
 
 const app = express();
-// 🛠️ CORRECCIÓN: Configuración de CORS para permitir cualquier origen en entornos de Azure
 app.use(cors({
     origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
@@ -12,19 +11,17 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// 📌 Conexión a MySQL usando variables de entorno
-const db = mysql.createConnection({
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASS || "",
-  database: process.env.DB_NAME || "coffeehub"
+// Conexión a SQLite
+const db = new sqlite3.Database(path.join(__dirname, 'coffeehub.db'), (err) => {
+  if (err) console.error("❌ Error conectando a SQLite:", err.message);
+  else console.log("✅ Conectado a la base de datos SQLite.");
 });
 
 db.connect((err) => {
   if (err) {
     console.error("❌ Error conectando a MySQL:", err.message);
   } else {
-    console.log("✅ Conectado a MySQL en", process.env.DB_HOST || "localhost");
+    console.log("✅ Conectado a MySQL en", process.env.DB_HOST || "localhost"); 
   }
 });
 
@@ -38,36 +35,35 @@ db.query(`CREATE TABLE IF NOT EXISTS coffees (
   roast VARCHAR(50) NOT NULL,
   rating DECIMAL(2,1) NOT NULL,
   description TEXT
-)`);
+)`, (err) => {
+    if (err) console.error("❌ Error creando tabla:", err.message);
+});
 
 // 📌 Insertar cafés de ejemplo solo si la tabla está vacía
-db.query("SELECT COUNT(*) as count FROM coffees", (err, rows) => {
-  if (err) {
-    console.error("❌ Error al contar cafés:", err.message);
-    return;
-  }
+db.query("SELECT COUNT(*) as count FROM coffees", (err, results) => {
+    if (err) {
+        console.error("❌ Error al contar cafés:", err.message);
+        return;
+    }
 
-  if (rows[0].count === 0) {
-    const samples = [
-      ["Blue Mountain Supreme", "Jamaica", "Arábica", 85.99, "Medio", 4.9, "Notas suaves de chocolate y nuez."],
-      ["Ethiopian Yirgacheffe", "Etiopía", "Arábica", 24.99, "Claro", 4.7, "Café floral y afrutado con notas cítricas."],
-      ["Colombian Supremo", "Colombia", "Arábica", 18.50, "Medio", 4.6, "Equilibrio perfecto entre acidez y cuerpo."],
-      ["Brazilian Santos", "Brasil", "Arábica", 15.99, "Medio-Oscuro", 4.3, "Café suave y cremoso con notas de chocolate."],
-      ["Vietnamese Robusta", "Vietnam", "Robusta", 12.99, "Oscuro", 4.1, "Café intenso y fuerte, alto en cafeína."],
-      ["Hawaiian Kona", "Hawái", "Arábica", 65.00, "Medio", 4.8, "Café aromático con notas de mantequilla y especias."]
-    ];
+    if (results[0].count === 0) {
+        const samples = [
+            ["Blue Mountain Supreme", "Jamaica", "Arábica", 85.99, "Medio", 4.9, "Notas suaves de chocolate y nuez."],
+            ["Ethiopian Yirgacheffe", "Etiopía", "Arábica", 24.99, "Claro", 4.7, "Café floral y afrutado con notas cítricas."],
+            ["Colombian Supremo", "Colombia", "Arábica", 18.50, "Medio", 4.6, "Equilibrio perfecto entre acidez y cuerpo."],
+            ["Brazilian Santos", "Brasil", "Arábica", 15.99, "Medio-Oscuro", 4.3, "Café suave y cremoso con notas de chocolate."],
+            ["Vietnamese Robusta", "Vietnam", "Robusta", 12.99, "Oscuro", 4.1, "Café intenso y fuerte, alto en cafeína."],
+            ["Hawaiian Kona", "Hawái", "Arábica", 65.00, "Medio", 4.8, "Café aromático con notas de mantequilla y especias."]
+        ];
 
-    const sql = `INSERT INTO coffees (name, origin, type, price, roast, rating, description)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`;
-
-    samples.forEach(c => {
-      db.query(sql, c, (err) => {
-        if (err) console.error("❌ Error insertando café:", err.message);
-      });
-    });
-
-    console.log("✅ Cafés de ejemplo cargados en MySQL");
-  }
+        const sql = `INSERT INTO coffees (name, origin, type, price, roast, rating, description)
+                     VALUES ?`;
+        
+        db.query(sql, [samples], (err, result) => {
+            if (err) console.error("❌ Error insertando cafés:", err.message);
+            else console.log(`✅ ${result.affectedRows} cafés de ejemplo cargados.`);
+        });
+    }
 });
 
 // 📌 Endpoints API
@@ -89,22 +85,28 @@ app.post("/coffees", (req, res) => {
 });
 
 app.get("/stats", (req, res) => {
-  db.query("SELECT COUNT(*) as total, AVG(price) as avgPrice FROM coffees", (err, rows) => {
+  const statsQuery = `
+    SELECT 
+      COUNT(*) as total, 
+      AVG(price) as avgPrice,
+      (SELECT origin FROM coffees GROUP BY origin ORDER BY COUNT(*) DESC LIMIT 1) as popularOrigin
+    FROM coffees
+  `;
+  
+  db.query(statsQuery, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
+    
+    const row = results[0];
+    const total = row.total;
+    const avgPrice = row.avgPrice ? parseFloat(row.avgPrice).toFixed(2) : 0;
+    const popularOrigin = row.popularOrigin || "-";
 
-    const total = rows[0].total;
-    const avgPrice = rows[0].avgPrice ? parseFloat(rows[0].avgPrice).toFixed(2) : 0;
-
-    db.query("SELECT origin, COUNT(*) as count FROM coffees GROUP BY origin ORDER BY count DESC LIMIT 1", (err2, origins) => {
-      if (err2) return res.status(500).json({ error: err2.message });
-      const popularOrigin = origins.length > 0 ? origins[0].origin : "-";
-      res.json({ total, avgPrice, popularOrigin });
-    });
+    res.json({ total, avgPrice, popularOrigin });
   });
 });
 
-// 📌 Servir frontend
-// Asegura que los archivos estáticos del frontend se sirvan desde la ruta raíz (/)
+
+// 📌 Servir frontend (Se mantiene la configuración para servir los archivos estáticos)
 app.use(express.static(path.join(__dirname, "../frontend")));
 
 const PORT = process.env.PORT || 4000;

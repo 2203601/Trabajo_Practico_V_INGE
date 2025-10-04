@@ -1,4 +1,4 @@
-const API_URL = ""; // <-- FIX: Use an empty string for relative paths
+const API_URL = ""; // 🛠️ CORRECCIÓN: Usa una ruta relativa para funcionar en Azure
 
 // Toggle del formulario
 function toggleForm() {
@@ -8,8 +8,7 @@ function toggleForm() {
 
 // Renderizar cafés
 async function renderCoffees() {
-  // Now fetches data from the current host (e.g., https://coffeehub-back-qa.azurewebsites.net/coffees)
-  const res = await fetch(`${API_URL}/coffees`); 
+  const res = await fetch(`${API_URL}/coffees`);
   const coffees = await res.json();
   const grid = document.getElementById("coffee-grid");
 
