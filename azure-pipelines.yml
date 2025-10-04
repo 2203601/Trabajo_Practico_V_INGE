@@ -1,5 +1,5 @@
 # azure-pipelines.yml
-# YAML FINAL CORREGIDO: CI/CD Completo con Docker (Build en Azure), SQLite, Sincronización, CORS y Configuración de URL.
+# YAML CORREGIDO: Conexión Backend-Frontend Funcional
 
 trigger:
   branches:
@@ -10,36 +10,25 @@ pool:
   name: SelfHosted
 
 variables:
-    # 🛑🛠️ 1. ACTUALIZAR: Nombre del Grupo de Recursos (CRÍTICO para Azure CLI)
     RESOURCE_GROUP_NAME: 'TPS-INGE-2025' 
-    # 🛑🛠️ 2. ACTUALIZAR: Nombre de tu conexión general de Azure (es la única que tienes)
     azureServiceConnection: 'azure-tp05-connection'
     
-    # Nombres de App Services
     backendAppNameQA: 'Coffeehub-Back-QA'
     frontendAppNameQA: 'Coffeehub-Front-QA'
     backendAppNameProd: 'Coffeehub-Back-Prod'
     frontendAppNameProd: 'Coffeehub-Front-Prod'
 
-
-# ===============================
-# BUILD STAGE (INTEGRACIÓN CONTINUA)
-# ===============================
 stages:
 - stage: Build
   displayName: "CI: Instalar, Probar y Empaquetar"
   jobs:
   - job: BuildJob
     steps:
-      # 1. Instalar dependencias del Backend (para pruebas y empaquetado)
       - script: |
           npm install
         displayName: 'Instalar Dependencias (Backend)'
         workingDirectory: 'coffehub/backend'
-
-      
         
-      # 3. Publicar Artefactos
       - task: PublishPipelineArtifact@1
         inputs:
           targetPath: 'coffehub/backend'
@@ -53,11 +42,6 @@ stages:
         displayName: "Publicar Código Frontend"
 
 
-
-
-# ===============================
-# DEPLOY QA (CD: Descarga el código, Build-on-Azure y Configuración)
-# ===============================
 - stage: Deploy_QA
   displayName: "CD: Desplegar a QA y Configurar Entorno"
   dependsOn: Build
@@ -69,14 +53,12 @@ stages:
       runOnce:
         deploy:
           steps:
-            # 1. Descargar Código Backend
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'backend-code'
                 path: '$(Pipeline.Workspace)/backend-source' 
               displayName: "Descargar Código Backend"
 
-            # 2. Desplegar Backend (Build Directo)
             - task: AzureWebApp@1
               displayName: "Deploy Backend QA (Build Directo)"
               inputs:
@@ -88,7 +70,6 @@ stages:
                 runtimeStack: 'DOCKER|CUSTOM' 
                 startUpCommand: 'sh -c "npm install && npm start"' 
             
-            # 3. Desplegar Frontend
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'frontend-code'
@@ -102,7 +83,7 @@ stages:
                 package: '$(Pipeline.Workspace)/frontend-source'
                 runtimeStack: 'NODE|18-lts'
 
-            # 🛑 4. TAREA CLAVE: Configurar URL del Backend en el Frontend App Service
+            # 🔧 CORREGIDO: URL con HTTPS y sintaxis correcta de variables
             - task: AzureCLI@2
               displayName: 'Configurar URL del Backend en Frontend QA'
               inputs:
@@ -110,14 +91,13 @@ stages:
                 scriptType: 'bash'
                 scriptLocation: 'inlineScript'
                 inlineScript: |
-                  # La variable 'BACKEND_URL' debe ser leída por tu código frontend.
-                  BACKEND_URL_VAL="coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net"
-                  FRONTEND_APP=$(frontendAppNameQA)
-                  RG=$(RESOURCE_GROUP_NAME)
+                  BACKEND_URL_VAL="https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net"
+                  FRONTEND_APP='$(frontendAppNameQA)'
+                  RG='$(RESOURCE_GROUP_NAME)'
                   echo "Configurando BACKEND_URL en $FRONTEND_APP a $BACKEND_URL_VAL"
-                  az webapp config appsettings set --name $FRONTEND_APP --resource-group $RG --settings BACKEND_URL=$BACKEND_URL_VAL
+                  az webapp config appsettings set --name "$FRONTEND_APP" --resource-group "$RG" --settings BACKEND_URL="$BACKEND_URL_VAL"
 
-            # 🛑 5. TAREA CLAVE: Configurar CORS en el Backend App Service
+            # 🔧 CORREGIDO: CORS con sintaxis correcta de variables
             - task: AzureCLI@2
               displayName: 'Configurar CORS en Backend QA'
               inputs:
@@ -125,18 +105,13 @@ stages:
                 scriptType: 'bash'
                 scriptLocation: 'inlineScript'
                 inlineScript: |
-                  # El backend debe aceptar peticiones desde la URL del frontend.
                   FRONTEND_URL_VAL="https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net"
-                  BACKEND_APP=$(backendAppNameQA)
-                  RG=$(RESOURCE_GROUP_NAME)
+                  BACKEND_APP='$(backendAppNameQA)'
+                  RG='$(RESOURCE_GROUP_NAME)'
                   echo "Configurando CORS en $BACKEND_APP para aceptar peticiones de $FRONTEND_URL_VAL"
-                  az webapp cors add --name $BACKEND_APP --resource-group $RG --allowed-origins $FRONTEND_URL_VAL 
+                  az webapp cors add --name "$BACKEND_APP" --resource-group "$RG" --allowed-origins "$FRONTEND_URL_VAL"
 
 
-
-# ---------------------------------
-# SINCRONIZACIÓN DE DATOS (Copia coffeehub.db)
-# ---------------------------------
 - stage: Sync_Data_QA_to_PROD
   displayName: "Sincronizar DB de QA a PROD (SQLite)"
   dependsOn: Deploy_QA
@@ -151,24 +126,18 @@ stages:
           azureSubscription: '$(azureServiceConnection)'
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
-          # Usamos curl/Kudu API para descargar el archivo específico
           inlineScript: |
             DB_FILE='coffeehub.db'
-            SOURCE_APP=$(backendAppNameQA)
-            TARGET_APP=$(backendAppNameProd)
-            RG=$(RESOURCE_GROUP_NAME)
+            SOURCE_APP='$(backendAppNameQA)'
+            TARGET_APP='$(backendAppNameProd)'
+            RG='$(RESOURCE_GROUP_NAME)'
             
             echo "Iniciando Sincronización (Descarga de $SOURCE_APP)..."
             
-            # Asegúrate de que curl y jq estén disponibles si estás usando un agente self-hosted personalizado
+            CRED_JSON=$(az webapp deployment list-latest -n "$SOURCE_APP" -g "$RG" --query "[0].publishingProfile.details" -o json 2>/dev/null)
             
-            # Obtener credenciales Kudu para descargar
-            CRED_JSON=$(az webapp deployment list-latest -n $SOURCE_APP -g $RG --query "[0].publishingProfile.details" -o json 2>/dev/null)
-            
-            # Verificación de credenciales (manejo de errores de jq si no se encuentra)
             if [ -z "$CRED_JSON" ] || ! command -v jq &> /dev/null; then
-                echo "##[warning]No se pudo obtener el perfil de publicación. Intentando descarga directa, puede fallar si se requiere autenticación Kudu."
-                # Asignar valores por defecto o vacíos si jq no está disponible o falla
+                echo "##[warning]No se pudo obtener el perfil de publicación."
                 USERNAME=""
                 PASSWORD=""
             else
@@ -178,36 +147,26 @@ stages:
             
             KUDU_URL="https://${SOURCE_APP}.scm.azurewebsites.net/api/vfs/site/wwwroot/$DB_FILE"
             
-            # Descargamos el archivo con curl, usando autenticación si está disponible
             if [ -n "$USERNAME" ] && [ -n "$PASSWORD" ]; then
                 curl -u "$USERNAME:$PASSWORD" -o "$DB_FILE" "$KUDU_URL"
             else
-                curl -o "$DB_FILE" "$KUDU_URL" # Intentar sin auth (a veces funciona en la CLI)
+                curl -o "$DB_FILE" "$KUDU_URL"
             fi
 
-            # Si el archivo tiene un tamaño > 0, asumimos éxito.
             if [ ! -s "$DB_FILE" ]; then
-                echo "##[error]Error al descargar $DB_FILE. El archivo no existe o el Kudu API falló. Verifique el nombre del archivo y la configuración."
+                echo "##[error]Error al descargar $DB_FILE."
                 exit 1 
             fi
             
-            echo "✅ Archivo $DB_FILE descargado exitosamente (Tamaño: $(du -h $DB_FILE | awk '{print $1}'))."
-            
-            # PASO 2: Subir el archivo coffeehub.db al App Service PROD (Sobrescribe)
-            echo "2. Subiendo DB a PROD ($TARGET_APP)..."
+            echo "✅ Archivo $DB_FILE descargado exitosamente."
             
             zip -r db_transfer.zip $DB_FILE
             
-            az webapp deploy --name $TARGET_APP --resource-group $RG --type zip --src-path db_transfer.zip --target-path '/home/site/wwwroot/'
+            az webapp deploy --name "$TARGET_APP" --resource-group "$RG" --type zip --src-path db_transfer.zip --target-path '/home/site/wwwroot/'
             
-            echo "✅ Datos de QA ($DB_FILE) copiados a PROD. Sincronización completada."
+            echo "✅ Datos de QA copiados a PROD."
 
 
-
-
-# ===============================
-# DEPLOY PROD (CD: Descarga el código, Build-on-Azure y Configuración)
-# ===============================
 - stage: Deploy_PROD
   displayName: "CD: Desplegar a Producción y Configurar Entorno"
   dependsOn: Sync_Data_QA_to_PROD 
@@ -219,14 +178,12 @@ stages:
       runOnce:
         deploy:
           steps:
-            # 1. Descargar Código Backend
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'backend-code'
                 path: '$(Pipeline.Workspace)/backend-source'
               displayName: "Descargar Código Backend"
 
-            # 2. Desplegar Backend
             - task: AzureWebApp@1
               displayName: "Deploy Backend PROD (Build Directo)"
               inputs:
@@ -238,7 +195,6 @@ stages:
                 runtimeStack: 'DOCKER|CUSTOM'
                 startUpCommand: 'sh -c "npm install && npm start"'
             
-            # 3. Desplegar Frontend
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'frontend-code'
@@ -252,7 +208,6 @@ stages:
                 package: '$(Pipeline.Workspace)/frontend-source'
                 runtimeStack: 'NODE|18-lts'  
 
-            # 🛑 4. TAREA CLAVE: Configurar URL del Backend en el Frontend App Service
             - task: AzureCLI@2
               displayName: 'Configurar URL del Backend en Frontend PROD'
               inputs:
@@ -261,12 +216,11 @@ stages:
                 scriptLocation: 'inlineScript'
                 inlineScript: |
                   BACKEND_URL_VAL="https://$(backendAppNameProd).azurewebsites.net"
-                  FRONTEND_APP=$(frontendAppNameProd)
-                  RG=$(RESOURCE_GROUP_NAME)
+                  FRONTEND_APP='$(frontendAppNameProd)'
+                  RG='$(RESOURCE_GROUP_NAME)'
                   echo "Configurando BACKEND_URL en $FRONTEND_APP a $BACKEND_URL_VAL"
-                  az webapp config appsettings set --name $FRONTEND_APP --resource-group $RG --settings BACKEND_URL=$BACKEND_URL_VAL
+                  az webapp config appsettings set --name "$FRONTEND_APP" --resource-group "$RG" --settings BACKEND_URL="$BACKEND_URL_VAL"
 
-            # 🛑 5. TAREA CLAVE: Configurar CORS en el Backend App Service
             - task: AzureCLI@2
               displayName: 'Configurar CORS en Backend PROD'
               inputs:
@@ -275,7 +229,7 @@ stages:
                 scriptLocation: 'inlineScript'
                 inlineScript: |
                   FRONTEND_URL_VAL="https://$(frontendAppNameProd).azurewebsites.net"
-                  BACKEND_APP=$(backendAppNameProd)
-                  RG=$(RESOURCE_GROUP_NAME)
+                  BACKEND_APP='$(backendAppNameProd)'
+                  RG='$(RESOURCE_GROUP_NAME)'
                   echo "Configurando CORS en $BACKEND_APP para aceptar peticiones de $FRONTEND_URL_VAL"
-                  az webapp cors add --name $BACKEND_APP --resource-group $RG --allowed-origins $FRONTEND_URL_VAL
+                  az webapp cors add --name "$BACKEND_APP" --resource-group "$RG" --allowed-origins "$FRONTEND_URL_VAL"
