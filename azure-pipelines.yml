@@ -71,20 +71,27 @@ stages:
               artifact: 'frontend'
               path: '$(Pipeline.Workspace)/frontend'
 
-          # 📦 Desplegar Backend
+          # 📦 Desplegar Backend QA con variables de entorno
           - task: AzureWebApp@1
             displayName: "Deploy Backend QA"
             inputs:
-              azureSubscription: 'azure-tp05-connection'
+              azureSubscription: '$(azureServiceConnection)'
               appName: '$(backendAppName)'
               package: '$(Pipeline.Workspace)/backend'
               runtimeStack: 'NODE|18-lts'
+              appSettings: |
+                [
+                  { "name": "DB_HOST", "value": "$(DB_HOST)" },
+                  { "name": "DB_USER", "value": "$(DB_USER)" },
+                  { "name": "DB_PASS", "value": "$(DB_PASS)" },
+                  { "name": "DB_NAME", "value": "$(DB_NAME)" }
+                ]
 
-          # 📦 Desplegar Frontend
+          # 📦 Desplegar Frontend QA
           - task: AzureWebApp@1
             displayName: "Deploy Frontend QA"
             inputs:
-              azureSubscription: 'azure-tp05-connection'
+              azureSubscription: '$(azureServiceConnection)'
               appName: '$(frontendAppName)'
               package: '$(Pipeline.Workspace)/frontend'
               runtimeStack: 'NODE|18-lts'
@@ -117,18 +124,27 @@ stages:
               artifact: 'frontend'
               path: '$(Pipeline.Workspace)/frontend'
 
+          # 📦 Desplegar Backend PROD con variables de entorno
           - task: AzureWebApp@1
             displayName: "Deploy Backend PROD"
             inputs:
-              azureSubscription: 'azure-tp05-connection'
+              azureSubscription: '$(azureServiceConnection)'
               appName: '$(backendAppName)'
               package: '$(Pipeline.Workspace)/backend'
               runtimeStack: 'NODE|18-lts'
+              appSettings: |
+                [
+                  { "name": "DB_HOST", "value": "$(DB_HOST)" },
+                  { "name": "DB_USER", "value": "$(DB_USER)" },
+                  { "name": "DB_PASS", "value": "$(DB_PASS)" },
+                  { "name": "DB_NAME", "value": "$(DB_NAME)" }
+                ]
 
+          # 📦 Desplegar Frontend PROD
           - task: AzureWebApp@1
             displayName: "Deploy Frontend PROD"
             inputs:
-              azureSubscription: 'azure-tp05-connection'
+              azureSubscription: '$(azureServiceConnection)'
               appName: '$(frontendAppName)'
               package: '$(Pipeline.Workspace)/frontend'
               runtimeStack: 'NODE|18-lts'
