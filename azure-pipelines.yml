@@ -1,69 +1,134 @@
 trigger:
   branches:
     include:
-    - main
+      - main
+
 pool:
-  name: SelfHosted
+  vmImage: 'ubuntu-latest'
+
 stages:
-- stage: CI
-  displayName: "Continuous Integration"
+# ===============================
+# BUILD STAGE
+# ===============================
+- stage: Build
+  displayName: "Build Backend & Frontend"
   jobs:
-  - job: Backend
-    displayName: "Backend CI"
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: coffeehub
-        ports:
-        - 3306:3306
+  - job: BuildJob
     steps:
     - task: NodeTool@0
       inputs:
         versionSpec: '18.x'
-    - task: CmdLine@2
-      displayName: "Install Backend"
+      displayName: "Use Node.js 18"
+
+    - script: |
+        cd coffehub/backend
+        npm install
+      displayName: "Install backend dependencies"
+
+    - script: |
+        cd coffehub/frontend
+        npm install || true
+        npm run build || echo "No build script definido"
+      displayName: "Build frontend"
+
+    - task: PublishPipelineArtifact@1
       inputs:
-        script: |
-          cd coffehub/backend
-          npm install
-    - task: CmdLine@2
-      displayName: "Run Backend Tests (Optional)"
-      continueOnError: true
+        targetPath: 'coffehub/backend'
+        artifact: 'backend'
+      displayName: "Publicar Backend"
+
+    - task: PublishPipelineArtifact@1
       inputs:
-        script: |
-          cd coffehub/backend
-          # Esperar un poco a que MySQL arranque
-          sleep 20
-          # Exportar variables para el backend
-          export DB_HOST=localhost
-          export DB_USER=root
-          export DB_PASS=root
-          export DB_NAME=coffeehub
-          npm test || echo "No tests definidos (skipped)"
-    - task: PublishBuildArtifacts@1
-      inputs:
-        PathtoPublish: 'coffehub/backend'
-        ArtifactName: 'backend'
-        publishLocation: 'Container'
-      displayName: "Publicar artefacto Backend"
-  - job: Frontend
-    displayName: "Frontend CI"
-    steps:
-    - task: NodeTool@0
-      inputs:
-        versionSpec: '18.x'
-    - task: CmdLine@2
-      displayName: "Build Frontend"
-      inputs:
-        script: |
-          cd coffehub/frontend
-          npm install || true
-          npm run build || echo "No build script definido"
-    - task: PublishBuildArtifacts@1
-      inputs:
-        PathtoPublish: 'coffehub/frontend'
-        ArtifactName: 'frontend'
-        publishLocation: 'Container'
-      displayName: "Publicar artefacto Frontend"
+        targetPath: 'coffehub/frontend'
+        artifact: 'frontend'
+      displayName: "Publicar Frontend"
+
+# ===============================
+# DEPLOY QA STAGE
+# ===============================
+- stage: Deploy_QA
+  displayName: "Desplegar a QA"
+  dependsOn: Build
+  condition: succeeded()
+  variables:
+    azureServiceConnection: 'azure-tp05-connection'
+    backendAppName: 'Coffeehub-Back-QA'
+    frontendAppName: 'Coffeehub-Front-QA'
+  jobs:
+  - deployment: DeployQA
+    environment: 'QA'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'backend'
+              path: '$(Pipeline.Workspace)/backend'
+
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'frontend'
+              path: '$(Pipeline.Workspace)/frontend'
+
+          # 📦 Desplegar Backend
+          - task: AzureWebApp@1
+            displayName: "Deploy Backend QA"
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              appName: '$(backendAppName)'
+              package: '$(Pipeline.Workspace)/backend'
+              runtimeStack: 'NODE|18-lts'
+
+          # 📦 Desplegar Frontend
+          - task: AzureWebApp@1
+            displayName: "Deploy Frontend QA"
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              appName: '$(frontendAppName)'
+              package: '$(Pipeline.Workspace)/frontend'
+              runtimeStack: 'NODE|18-lts'
+
+# ===============================
+# DEPLOY PRODUCTION STAGE
+# ===============================
+- stage: Deploy_PROD
+  displayName: "Desplegar a Producción"
+  dependsOn: Deploy_QA
+  condition: succeeded()
+  variables:
+    azureServiceConnection: 'azure-tp05-connection'
+    backendAppName: 'Coffeehub-Back-Prod'
+    frontendAppName: 'Coffeehub-Front-Prod'
+  jobs:
+  - deployment: DeployPROD
+    environment: 'PRODUCCION'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'backend'
+              path: '$(Pipeline.Workspace)/backend'
+
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'frontend'
+              path: '$(Pipeline.Workspace)/frontend'
+
+          - task: AzureWebApp@1
+            displayName: "Deploy Backend PROD"
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              appName: '$(backendAppName)'
+              package: '$(Pipeline.Workspace)/backend'
+              runtimeStack: 'NODE|18-lts'
+
+          - task: AzureWebApp@1
+            displayName: "Deploy Frontend PROD"
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              appName: '$(frontendAppName)'
+              package: '$(Pipeline.Workspace)/frontend'
+              runtimeStack: 'NODE|18-lts'
