@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // URL del backend desde variable de entorno
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 
 // Middleware para inyectar variables en HTML
 app.use((req, res, next) => {

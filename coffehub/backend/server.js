@@ -3,13 +3,13 @@ const cors = require("cors");
 const sqlite3 = require('sqlite3').verbose();
 const path = require("path");
 
-const app = express();
+const app = express();   // ✅ primero creamos la app
+
 app.use(cors({
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
+  origin: "http://localhost:8080", // el frontend
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: false               // ⚠️ o true solo si usas cookies
 }));
-app.use(express.json());
 
 // Conexión a SQLite
 const dbPath = path.join(__dirname, 'coffeehub.db');

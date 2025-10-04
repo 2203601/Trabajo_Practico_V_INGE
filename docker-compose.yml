@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # 1. SERVICIO DE LA BASE DE DATOS (MySQL)
+  db:
+    image: mysql:8.0
+    container_name: coffeehub-db
+    restart: always
+    environment:
+      # Credenciales para el inicio, necesarias para que el contenedor MySQL se levante
+      MYSQL_ROOT_PASSWORD: MyRootPasswordSegura
+      MYSQL_DATABASE: coffeehub
+      MYSQL_USER: devops_user
+      MYSQL_PASSWORD: DevOpsPasswordSegura
+
+    # Opcional: Esto permite que los datos persistan incluso si el contenedor se reinicia.
+    # Necesitarías configurar un volumen persistente en Azure.
+    # volumes:
+    #   - db_data:/var/lib/mysql
+
+  # 2. SERVICIO DEL BACKEND (Node.js)
+  backend:
+    build: 
+      context: ./coffehub/backend # Usa el Dockerfile que acabas de crear
+      dockerfile: Dockerfile
+    container_name: coffeehub-backend
+    restart: always
+    ports:
+      - "4000:4000" # Mapeo de puertos, aunque Azure lo maneja
+    environment:
+      # 🛠️ CONEXIÓN CLAVE: El Host es el nombre del servicio de Docker (db)
+      DB_HOST: db 
+      DB_USER: devops_user
+      DB_PASS: DevOpsPasswordSegura
+      DB_NAME: coffeehub
+      PORT: 4000
+    depends_on:
+      - db # Asegura que la DB se inicie antes que el Backend
+
+  # 3. SERVICIO DEL FRONTEND (Usaremos Nginx para servir estáticos)
+  frontend:
+    # Este es más complejo en Docker Compose puro.
+    # Es mucho más fácil seguir sirviendo el frontend estático
+    # directamente desde el App Service o el mismo Backend de Node.js.
+    # Mantendremos el Backend de Node.js sirviendo el Frontend como antes
+    # para simplificar el pipeline.
+
+# volumes:
+#   db_data:
