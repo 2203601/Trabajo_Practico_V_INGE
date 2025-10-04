@@ -44,16 +44,48 @@ stages:
       displayName: "Publicar Frontend"
 
 # ===============================
-# DEPLOY QA STAGE
+# SYNC QA WITH PROD
+# ===============================
+- stage: Sync_QA
+  displayName: "Actualizar QA con datos de PROD"
+  dependsOn: Build
+  condition: succeeded()
+  variables:
+    QA_DB_HOST: 'qa-db-host'
+    QA_DB_USER: 'qa_user'
+    QA_DB_PASS: 'qa_password'
+    QA_DB_NAME: 'coffeehub_qa'
+    PROD_DB_HOST: 'localhost'
+    PROD_DB_USER: 'root'
+    PROD_DB_PASS: ''
+    PROD_DB_NAME: 'coffeehub'
+  jobs:
+  - job: SyncQA
+    displayName: "Sync QA Database"
+    steps:
+    - script: |
+        echo "Dumping PROD database..."
+        mysqldump -h $(PROD_DB_HOST) -u $(PROD_DB_USER) -p$(PROD_DB_PASS) $(PROD_DB_NAME) > prod_dump.sql
+
+        echo "Restoring dump into QA..."
+        mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p$(QA_DB_PASS) $(QA_DB_NAME) < prod_dump.sql
+      displayName: "Dump PROD -> Restore QA"
+
+# ===============================
+# DEPLOY QA
 # ===============================
 - stage: Deploy_QA
   displayName: "Desplegar a QA"
-  dependsOn: Build
+  dependsOn: Sync_QA
   condition: succeeded()
   variables:
     azureServiceConnection: 'azure-tp05-connection'
     backendAppName: 'Coffeehub-Back-QA'
     frontendAppName: 'Coffeehub-Front-QA'
+    DB_HOST: 'qa-db-host'
+    DB_USER: 'qa_user'
+    DB_PASS: 'qa_password'
+    DB_NAME: 'coffeehub_qa'
   jobs:
   - deployment: DeployQA
     environment: 'QA'
@@ -71,7 +103,6 @@ stages:
               artifact: 'frontend'
               path: '$(Pipeline.Workspace)/frontend'
 
-          # 📦 Desplegar Backend QA con variables de entorno
           - task: AzureWebApp@1
             displayName: "Deploy Backend QA"
             inputs:
@@ -85,7 +116,6 @@ stages:
                 DB_PASS=$(DB_PASS)
                 DB_NAME=$(DB_NAME)
 
-          # 📦 Desplegar Frontend QA
           - task: AzureWebApp@1
             displayName: "Deploy Frontend QA"
             inputs:
@@ -95,7 +125,7 @@ stages:
               runtimeStack: 'NODE|18-lts'
 
 # ===============================
-# DEPLOY PRODUCTION STAGE
+# DEPLOY PROD
 # ===============================
 - stage: Deploy_PROD
   displayName: "Desplegar a Producción"
@@ -105,6 +135,10 @@ stages:
     azureServiceConnection: 'azure-tp05-connection'
     backendAppName: 'Coffeehub-Back-Prod'
     frontendAppName: 'Coffeehub-Front-Prod'
+    DB_HOST: 'localhost'
+    DB_USER: 'root'
+    DB_PASS: ''
+    DB_NAME: 'coffeehub'
   jobs:
   - deployment: DeployPROD
     environment: 'PROD'
@@ -122,7 +156,6 @@ stages:
               artifact: 'frontend'
               path: '$(Pipeline.Workspace)/frontend'
 
-          # 📦 Desplegar Backend PROD con variables de entorno
           - task: AzureWebApp@1
             displayName: "Deploy Backend PROD"
             inputs:
@@ -136,7 +169,6 @@ stages:
                 DB_PASS=$(DB_PASS)
                 DB_NAME=$(DB_NAME)
 
-          # 📦 Desplegar Frontend PROD
           - task: AzureWebApp@1
             displayName: "Deploy Frontend PROD"
             inputs:
@@ -144,3 +176,9 @@ stages:
               appName: '$(frontendAppName)'
               package: '$(Pipeline.Workspace)/frontend'
               runtimeStack: 'NODE|18-lts'
+
+          - script: |
+              echo "Aplicando migraciones en PROD..."
+              cd coffehub/backend
+              npx sequelize db:migrate
+            displayName: "Migraciones PROD"
