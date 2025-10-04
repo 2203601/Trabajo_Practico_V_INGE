@@ -8,9 +8,9 @@ pool:
   name: SelfHosted
 
 stages:
-# ===============================
+# 
 # BUILD STAGE
-# ===============================
+# 
 - stage: Build
   displayName: "Build Backend & Frontend"
   jobs:
@@ -44,7 +44,6 @@ stages:
           artifact: 'frontend'
         displayName: "Publicar Frontend"
 
----
 
 # ===============================
 # SYNC QA WITH PROD (CORREGIDO)
@@ -81,7 +80,7 @@ stages:
           echo "Sincronización completada."
         displayName: "Dump PROD -> Restore QA (Corregido)"
 
----
+
 
 # ===============================
 # DEPLOY QA
@@ -137,7 +136,7 @@ stages:
                 package: '$(Pipeline.Workspace)/frontend'
                 runtimeStack: 'NODE|18-lts'
 
----
+
 
 # ===============================
 # DEPLOY PROD
