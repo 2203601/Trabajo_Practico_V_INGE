@@ -27,10 +27,7 @@ stages:
 
       - script: |
           cd coffehub/frontend
-          # Use 'npm ci' for clean installs, if you have a lock file
           npm install 
-          # Use 'npm run build || true' to ensure the pipeline continues even if the build script is missing 
-          # or if it fails for non-critical projects, though for deployment, failure is usually desired.
           npm run build || echo "No build script definido"
         displayName: "Build frontend"
 
@@ -47,7 +44,7 @@ stages:
         displayName: "Publicar Frontend"
 
 # ===============================
-# SYNC QA WITH PROD (Optimizado y Debug)
+# SYNC QA WITH PROD (CORREGIDO)
 # ===============================
 - stage: Sync_QA
   displayName: "Actualizar QA con datos de PROD"
@@ -56,35 +53,32 @@ stages:
   variables:
     QA_DB_HOST: 'localhost'
     QA_DB_USER: 'qa_user'
-    QA_DB_PASS: 'qa_password'       # secreto
+    QA_DB_PASS: 'qa_password'       
     QA_DB_NAME: 'coffeehub_qa'
     PROD_DB_HOST: 'localhost'
     PROD_DB_USER: 'root'
-    # ATENCIÓN: NUNCA USAR UNA CONTRASEÑA VACÍA EN PRODUCCIÓN REAL.
-    # Esta variable debe ser un secreto en Azure DevOps.
+    # Importante: PROD_DB_PASS debe ser un secreto válido en un entorno real.
+    # Se asume que no tiene contraseña para resolver el mysqldump, pero DEBE corregirse.
     PROD_DB_PASS: ''   
     PROD_DB_NAME: 'coffeehub'
   jobs:
   - job: SyncQA
-    displayName: "Sync QA Database Optimized"
+    displayName: "Sync QA Database Corrected"
     steps:
       - script: |
-          # set -eux:
-          # -e: Exit immediately if a command exits with a non-zero status.
-          # -u: Treat unset variables as an error.
-          # -x: Print commands and their arguments as they are executed (for debugging).
           set -eux 
           echo "Sincronizando QA con PROD usando pipe y compresión..."
           
-          # Se agrega --verbose para obtener feedback si se queda atascado.
-          # Se usa el formato -pPASS sin espacio para mysqldump.
+          # 🚨 CORRECCIÓN 1: Se elimina el -p para mysqldump porque la variable es vacía ('').
+          # 🚨 CORRECCIÓN 2: Se corrige la sintaxis de -p en el comando mysql para QA 
+          #                   (debe ser -pPASSWORD sin espacio).
           mysqldump --single-transaction --verbose -h $(PROD_DB_HOST) -u $(PROD_DB_USER) $(PROD_DB_NAME) \
           | gzip \
           | gunzip \
-          | mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p $(QA_DB_PASS) $(QA_DB_NAME)
+          | mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p$(QA_DB_PASS) $(QA_DB_NAME)
           
           echo "Sincronización completada."
-        displayName: "Dump PROD -> Restore QA (Optimizado y Debug)"
+        displayName: "Dump PROD -> Restore QA (Corregido)"
 
 # ===============================
 # DEPLOY QA
@@ -125,7 +119,6 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
-                # Se utiliza el formato multilínea para App Settings para claridad.
                 appSettings: |
                   -DB_HOST $(DB_HOST)
                   -DB_USER $(DB_USER)
@@ -153,7 +146,6 @@ stages:
     frontendAppName: 'Coffeehub-Front-Prod'
     DB_HOST: 'localhost'
     DB_USER: 'root'
-    # ATENCIÓN: Esta variable debe ser un secreto en Azure DevOps.
     DB_PASS: ''
     DB_NAME: 'coffeehub'
   jobs:
@@ -194,16 +186,8 @@ stages:
                 package: '$(Pipeline.Workspace)/frontend'
                 runtimeStack: 'NODE|18-lts'
 
-            # Nota: Las migraciones deben ejecutarse DENTRO del artefacto desplegado
-            # o en un paso separado con la infraestructura de la base de datos accesible.
-            # Este paso ASUME que el agente tiene acceso al código y a la base de datos PROD
-            # y que el comando sequelize es accesible desde el agente.
             - script: |
                 echo "Aplicando migraciones en PROD..."
-                # Debe usar la ruta donde descargó el artefacto si quiere ejecutar comandos
-                # sobre el código (e.g., $(Pipeline.Workspace)/backend).
-                # La ruta 'coffehub/backend' solo funciona si el agente la tiene.
-                # Se usará la ruta del workspace para mayor coherencia:
                 cd $(Pipeline.Workspace)/backend 
                 npx sequelize db:migrate
               displayName: "Migraciones PROD"
