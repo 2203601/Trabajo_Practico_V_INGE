@@ -1,9 +1,9 @@
 // ================================
-// ☕ CoffeeHub Backend - CORS FIXED
+// ☕ CoffeeHub Backend - better-sqlite3
 // ================================
 import express from "express";
 import cors from "cors";
-import sqlite3 from "sqlite3";
+import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -13,7 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // ================================
-// 🌐 CORS - CONFIGURACIÓN CORREGIDA
+// 🌐 CORS
 // ================================
 const allowedOrigins = [
   "http://localhost:8080",
@@ -24,39 +24,31 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir solicitudes sin origen (Postman, curl, etc.)
     if (!origin) return callback(null, true);
-    
-    // Verificar si el origen está permitido
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
-    // Registrar intentos bloqueados para debugging
-    console.warn(`⚠️ CORS bloqueado para: ${origin}`);
+    console.warn(`CORS bloqueado para: ${origin}`);
     return callback(new Error(`CORS no permitido para: ${origin}`));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true, // Si usas cookies/sesiones
+  credentials: true,
 }));
 
-// ❗ IMPORTANTE: OPTIONS debe manejarse antes de otros middlewares
 app.options('*', cors());
-
 app.use(express.json());
 
 // ================================
-// 💾 Config DB (SQLite)
+// 💾 Config DB (better-sqlite3)
 // ================================
 const dbPath = path.join(__dirname, "coffeehub.db");
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) console.error("❌ Error al conectar con SQLite:", err.message);
-  else console.log("✅ Conectado a la base de datos CoffeeHub.");
-});
+const db = new Database(dbPath);
+
+console.log("Conectado a la base de datos CoffeeHub.");
 
 // Crear tabla si no existe
-db.run(`
+db.exec(`
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -73,66 +65,66 @@ db.run(`
 // 📦 Endpoints API
 // ================================
 
+// Health check
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // GET todos los productos
 app.get("/api/products", (req, res) => {
-  db.all("SELECT * FROM products", (err, rows) => {
-    if (err) {
-      console.error("❌ Error al obtener productos:", err);
-      return res.status(500).json({ error: "Error interno del servidor" });
-    }
+  try {
+    const stmt = db.prepare("SELECT * FROM products");
+    const rows = stmt.all();
     res.json(rows);
-  });
+  } catch (err) {
+    console.error("Error al obtener productos:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
 });
 
 // POST agregar producto
 app.post("/api/products", (req, res) => {
   const { name, origin, type, price, roast, rating, description } = req.body;
   
-  db.run(
-    `INSERT INTO products (name, origin, type, price, roast, rating, description) 
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [name, origin, type, price, roast, rating, description],
-    function(err) {
-      if (err) {
-        console.error("❌ Error al insertar producto:", err);
-        return res.status(500).json({ error: "Error al crear producto" });
-      }
-      res.status(201).json({ id: this.lastID, ...req.body });
-    }
-  );
+  try {
+    const stmt = db.prepare(
+      `INSERT INTO products (name, origin, type, price, roast, rating, description) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const result = stmt.run(name, origin, type, price, roast, rating, description);
+    res.status(201).json({ id: result.lastInsertRowid, ...req.body });
+  } catch (err) {
+    console.error("Error al insertar producto:", err);
+    res.status(500).json({ error: "Error al crear producto" });
+  }
 });
 
 // GET estadísticas
 app.get("/api/stats", (req, res) => {
-  db.get(
-    `SELECT 
-      COUNT(*) as total,
-      ROUND(AVG(price), 2) as avgPrice,
-      (SELECT origin FROM products GROUP BY origin ORDER BY COUNT(*) DESC LIMIT 1) as popularOrigin
-    FROM products`,
-    (err, row) => {
-      if (err) {
-        console.error("❌ Error al obtener estadísticas:", err);
-        return res.status(500).json({ error: "Error interno del servidor" });
-      }
-      res.json({
-        total: row.total || 0,
-        avgPrice: row.avgPrice || 0,
-        popularOrigin: row.popularOrigin || "N/A"
-      });
-    }
-  );
-});
-
-// Health check
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  try {
+    const stmt = db.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        ROUND(AVG(price), 2) as avgPrice,
+        (SELECT origin FROM products GROUP BY origin ORDER BY COUNT(*) DESC LIMIT 1) as popularOrigin
+      FROM products
+    `);
+    const row = stmt.get();
+    res.json({
+      total: row.total || 0,
+      avgPrice: row.avgPrice || 0,
+      popularOrigin: row.popularOrigin || "N/A"
+    });
+  } catch (err) {
+    console.error("Error al obtener estadísticas:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
 });
 
 // ================================
 // 🚀 Iniciar servidor
 // ================================
 app.listen(PORT, () => {
-  console.log(`✅ CoffeeHub Backend corriendo en puerto ${PORT}`);
-  console.log(`🔗 Orígenes permitidos:`, allowedOrigins);
+  console.log(`CoffeeHub Backend corriendo en puerto ${PORT}`);
+  console.log(`Orígenes permitidos:`, allowedOrigins);
 });
