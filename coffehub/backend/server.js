@@ -1,16 +1,33 @@
 // ================================
-// ☕ CoffeeHub Backend - better-sqlite3
+// ☕ CoffeeHub Backend - MongoDB
 // ================================
 import express from "express";
 import cors from "cors";
-import Database from "better-sqlite3";
-import path from "path";
-import { fileURLToPath } from "url";
+import { MongoClient, ObjectId } from "mongodb";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+// ================================
+// 🔗 MongoDB Connection
+// ================================
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://coffeehub_user:nRgryLkN9M5kHPQJ@cluster0.3ozasn4.mongodb.net/coffeehub?retryWrites=true&w=majority&appName=Cluster0";
+
+let db;
+let productsCollection;
+
+async function connectDB() {
+  try {
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    db = client.db("coffeehub");
+    productsCollection = db.collection("products");
+    console.log("✅ Conectado a MongoDB Atlas");
+  } catch (error) {
+    console.error("❌ Error conectando a MongoDB:", error);
+    process.exit(1);
+  }
+}
 
 // ================================
 // 🌐 CORS
@@ -40,42 +57,23 @@ app.options('*', cors());
 app.use(express.json());
 
 // ================================
-// 💾 Config DB (better-sqlite3)
-// ================================
-const dbPath = path.join(__dirname, "coffeehub.db");
-const db = new Database(dbPath);
-
-console.log("Conectado a la base de datos CoffeeHub.");
-
-// Crear tabla si no existe
-db.exec(`
-  CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    origin TEXT NOT NULL,
-    type TEXT NOT NULL,
-    price REAL NOT NULL,
-    roast TEXT NOT NULL,
-    rating REAL NOT NULL,
-    description TEXT
-  )
-`);
-
-// ================================
 // 📦 Endpoints API
 // ================================
 
 // Health check
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    database: db ? "connected" : "disconnected"
+  });
 });
 
 // GET todos los productos
-app.get("/api/products", (req, res) => {
+app.get("/api/products", async (req, res) => {
   try {
-    const stmt = db.prepare("SELECT * FROM products");
-    const rows = stmt.all();
-    res.json(rows);
+    const products = await productsCollection.find({}).toArray();
+    res.json(products);
   } catch (err) {
     console.error("Error al obtener productos:", err);
     res.status(500).json({ error: "Error interno del servidor" });
@@ -83,16 +81,26 @@ app.get("/api/products", (req, res) => {
 });
 
 // POST agregar producto
-app.post("/api/products", (req, res) => {
+app.post("/api/products", async (req, res) => {
   const { name, origin, type, price, roast, rating, description } = req.body;
   
   try {
-    const stmt = db.prepare(
-      `INSERT INTO products (name, origin, type, price, roast, rating, description) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    );
-    const result = stmt.run(name, origin, type, price, roast, rating, description);
-    res.status(201).json({ id: result.lastInsertRowid, ...req.body });
+    const newProduct = {
+      name,
+      origin,
+      type,
+      price: parseFloat(price),
+      roast,
+      rating: parseFloat(rating),
+      description: description || "Sin descripción",
+      createdAt: new Date()
+    };
+    
+    const result = await productsCollection.insertOne(newProduct);
+    res.status(201).json({ 
+      _id: result.insertedId,
+      ...newProduct 
+    });
   } catch (err) {
     console.error("Error al insertar producto:", err);
     res.status(500).json({ error: "Error al crear producto" });
@@ -100,20 +108,27 @@ app.post("/api/products", (req, res) => {
 });
 
 // GET estadísticas
-app.get("/api/stats", (req, res) => {
+app.get("/api/stats", async (req, res) => {
   try {
-    const stmt = db.prepare(`
-      SELECT 
-        COUNT(*) as total,
-        ROUND(AVG(price), 2) as avgPrice,
-        (SELECT origin FROM products GROUP BY origin ORDER BY COUNT(*) DESC LIMIT 1) as popularOrigin
-      FROM products
-    `);
-    const row = stmt.get();
+    const products = await productsCollection.find({}).toArray();
+    
+    const total = products.length;
+    const avgPrice = total > 0 
+      ? (products.reduce((sum, p) => sum + (p.price || 0), 0) / total).toFixed(2)
+      : 0;
+    
+    // Encontrar origen más popular
+    const origins = products.map(p => p.origin).filter(Boolean);
+    const popularOrigin = origins.length > 0
+      ? origins.sort((a, b) => 
+          origins.filter(o => o === b).length - origins.filter(o => o === a).length
+        )[0]
+      : "N/A";
+
     res.json({
-      total: row.total || 0,
-      avgPrice: row.avgPrice || 0,
-      popularOrigin: row.popularOrigin || "N/A"
+      total,
+      avgPrice,
+      popularOrigin
     });
   } catch (err) {
     console.error("Error al obtener estadísticas:", err);
@@ -124,7 +139,12 @@ app.get("/api/stats", (req, res) => {
 // ================================
 // 🚀 Iniciar servidor
 // ================================
-app.listen(PORT, () => {
-  console.log(`CoffeeHub Backend corriendo en puerto ${PORT}`);
-  console.log(`Orígenes permitidos:`, allowedOrigins);
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`✅ CoffeeHub Backend corriendo en puerto ${PORT}`);
+    console.log(`🔗 Orígenes permitidos:`, allowedOrigins);
+  });
+}).catch(err => {
+  console.error("❌ No se pudo iniciar el servidor:", err);
+  process.exit(1);
 });

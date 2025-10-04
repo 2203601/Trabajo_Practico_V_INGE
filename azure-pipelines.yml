@@ -1,11 +1,5 @@
 # ===========================================
-# COFFEEHUB CI/CD - QA y PRODUCCIÓN (Azure)
-# ===========================================
-# Funcionalidades:
-# - Build del backend y frontend
-# - Deploy a QA (con CORS y BACKEND_URL configurados)
-# - Copia automática del coffeehub.db a PROD
-# - Deploy a Producción
+# COFFEEHUB CI/CD - QA y PRODUCCIÓN (Azure + MongoDB)
 # ===========================================
 
 trigger:
@@ -17,6 +11,7 @@ pool:
   name: SelfHosted
 
 variables:
+  group: CoffeeHub-Secrets
   RESOURCE_GROUP_NAME: 'TPS-INGE-2025'
   azureServiceConnection: 'azure-tp05-connection'
   
@@ -24,7 +19,9 @@ variables:
   frontendAppNameQA: 'Coffeehub-Front-QA'
   backendAppNameProd: 'Coffeehub-Back-Prod'
   frontendAppNameProd: 'Coffeehub-Front-Prod'
-
+  
+  # MongoDB connection string (debe estar en Azure DevOps Variables)
+  # MONGODB_URI: 'mongodb+srv://...'
 
 # -------------------- STAGE 1: BUILD --------------------
 stages:
@@ -79,6 +76,22 @@ stages:
                 runtimeStack: 'NODE|18-lts'
                 startUpCommand: 'npm install && npm start'
 
+            # ---- Configurar MongoDB en Backend QA ----
+            - task: AzureCLI@2
+              displayName: 'Configurar MONGODB_URI en Backend QA'
+              inputs:
+                azureSubscription: '$(azureServiceConnection)'
+                scriptType: 'bash'
+                scriptLocation: 'inlineScript'
+                inlineScript: |
+                  BACKEND_APP='$(backendAppNameQA)'
+                  RG='$(RESOURCE_GROUP_NAME)'
+                  echo "➡️ Configurando MongoDB en $BACKEND_APP"
+                  az webapp config appsettings set \
+                    --name "$BACKEND_APP" \
+                    --resource-group "$RG" \
+                    --settings MONGODB_URI="$(MONGODB_URI)"
+
             # ---- Frontend ----
             - task: DownloadPipelineArtifact@2
               inputs:
@@ -122,48 +135,12 @@ stages:
                   az webapp cors add --name "$BACKEND_APP" --resource-group "$RG" --allowed-origins "$FRONTEND_URL_VAL"
 
 
-# -------------------- STAGE 3: SYNC QA → PROD --------------------
-- stage: Sync_Data_QA_to_PROD
-  displayName: "Sincronizar Base de Datos QA → PROD"
-  dependsOn: Deploy_QA
-  condition: succeeded()
-  jobs:
-  - deployment: SyncData
-    environment: 'PROD'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - task: AzureCLI@2
-              displayName: "Copiar coffeehub.db de QA a PROD"
-              inputs:
-                azureSubscription: '$(azureServiceConnection)'
-                scriptType: 'bash'
-                scriptLocation: 'inlineScript'
-                inlineScript: |
-                  DB_FILE='coffeehub.db'
-                  SOURCE_APP='$(backendAppNameQA)'
-                  TARGET_APP='$(backendAppNameProd)'
-                  RG='$(RESOURCE_GROUP_NAME)'
-
-                  echo "⬇️ Descargando DB desde $SOURCE_APP ..."
-                  curl -o $DB_FILE "https://${SOURCE_APP}.scm.azurewebsites.net/api/vfs/site/wwwroot/$DB_FILE"
-
-                  if [ ! -s "$DB_FILE" ]; then
-                      echo "❌ Error: no se pudo descargar $DB_FILE"
-                      exit 1
-                  fi
-
-                  echo "✅ Base de datos descargada. Subiendo a $TARGET_APP..."
-                  zip -r db_transfer.zip $DB_FILE
-                  az webapp deploy --name "$TARGET_APP" --resource-group "$RG" --type zip --src-path db_transfer.zip --target-path '/home/site/wwwroot/'
-                  echo "✅ DB sincronizada con éxito entre QA y PROD."
-
-
-# -------------------- STAGE 4: DEPLOY PROD --------------------
+# -------------------- STAGE 3: DEPLOY PROD --------------------
+# Con MongoDB, QA y PROD comparten la misma base de datos
+# No necesitas sincronizar archivos
 - stage: Deploy_PROD
   displayName: "CD: Desplegar Producción + Configurar Entorno"
-  dependsOn: Sync_Data_QA_to_PROD
+  dependsOn: Deploy_QA
   condition: succeeded()
   jobs:
   - deployment: DeployPROD
@@ -186,6 +163,22 @@ stages:
                 package: '$(Pipeline.Workspace)/backend-source'
                 runtimeStack: 'NODE|18-lts'
                 startUpCommand: 'npm install && npm start'
+
+            # ---- Configurar MongoDB en Backend PROD ----
+            - task: AzureCLI@2
+              displayName: 'Configurar MONGODB_URI en Backend PROD'
+              inputs:
+                azureSubscription: '$(azureServiceConnection)'
+                scriptType: 'bash'
+                scriptLocation: 'inlineScript'
+                inlineScript: |
+                  BACKEND_APP='$(backendAppNameProd)'
+                  RG='$(RESOURCE_GROUP_NAME)'
+                  echo "➡️ Configurando MongoDB en $BACKEND_APP"
+                  az webapp config appsettings set \
+                    --name "$BACKEND_APP" \
+                    --resource-group "$RG" \
+                    --settings MONGODB_URI="$(MONGODB_URI)"
 
             # ---- Frontend ----
             - task: DownloadPipelineArtifact@2
