@@ -1,6 +1,12 @@
 // server.js - Servidor Express para servir el frontend con variables de entorno
-const express = require('express');
-const path = require('path');
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 
 // Puerto desde variable de entorno (Azure usa PORT)
@@ -15,19 +21,18 @@ app.use((req, res, next) => {
     const filePath = req.path === '/' 
       ? path.join(__dirname, 'index.html')
       : path.join(__dirname, req.path);
-    
-    const fs = require('fs');
+
     fs.readFile(filePath, 'utf8', (err, data) => {
       if (err) {
         return next();
       }
-      
+
       // Inyectar variable en el <head>
       const injected = data.replace(
         '</head>',
         `<script>window.BACKEND_URL = '${BACKEND_URL}';</script></head>`
       );
-      
+
       res.type('html').send(injected);
     });
   } else {
