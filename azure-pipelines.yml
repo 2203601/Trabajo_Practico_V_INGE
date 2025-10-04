@@ -1,5 +1,5 @@
 # azure-pipelines.yml
-# YAML FINAL: CI/CD Completo con Docker (Build en Azure), SQLite y Sincronización de Datos QA -> PROD
+# YAML FINAL CORREGIDO: CI/CD Completo con Docker (Build en Azure), SQLite y Sincronización de Datos QA -> PROD
 
 trigger:
   branches:
@@ -37,8 +37,13 @@ stages:
         displayName: 'Instalar Dependencias (Backend)'
         workingDirectory: 'coffehub/backend'
 
-
-
+      # 2. Ejecutar Pruebas Unitarias (CI) - RESTAURADO
+      # Nota: Debes tener un script 'test' definido en package.json
+      - script: |
+          npm test
+        displayName: 'Ejecutar Pruebas Unitarias'
+        workingDirectory: 'coffehub/backend'
+        
       # 3. Publicar la Carpeta del Backend (código fuente y Dockerfile)
       - task: PublishPipelineArtifact@1
         inputs:
@@ -73,7 +78,8 @@ stages:
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'backend-code'
-                path: '$(Pipeline.Workspace)/backend' 
+                # RUTA CORREGIDA: Usamos /backend-source
+                path: '$(Pipeline.Workspace)/backend-source' 
               displayName: "Descargar Código Backend"
 
             # 2. Despliega la Carpeta y Fuerza el Build/Run en Azure (Contenedor Docker)
@@ -83,7 +89,7 @@ stages:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameQA)'
                 appType: 'webAppContainer'
-                # Path del código descargado que Azure usará para construir el Docker
+                # PATH CORRECTO: Apunta a la carpeta donde se descargó el artefacto
                 package: '$(Pipeline.Workspace)/backend-source' 
                 deploymentMethod: 'auto'
                 runtimeStack: 'DOCKER|CUSTOM' 
@@ -100,6 +106,7 @@ stages:
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameQA)'
+                # PATH CORRECTO
                 package: '$(Pipeline.Workspace)/frontend-source'
                 runtimeStack: 'NODE|18-lts'
 
@@ -172,6 +179,7 @@ stages:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameProd)'
                 appType: 'webAppContainer'
+                # PATH CORRECTO
                 package: '$(Pipeline.Workspace)/backend-source' 
                 deploymentMethod: 'auto'
                 runtimeStack: 'DOCKER|CUSTOM'
@@ -188,5 +196,6 @@ stages:
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameProd)'
+                # PATH CORRECTO
                 package: '$(Pipeline.Workspace)/frontend-source'
                 runtimeStack: 'NODE|18-lts'
