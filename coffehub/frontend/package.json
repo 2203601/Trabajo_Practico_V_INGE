@@ -1,0 +1,12 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "noder server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+
+}

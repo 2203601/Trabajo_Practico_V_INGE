@@ -82,6 +82,7 @@ stages:
                 appName: '$(frontendAppNameQA)'
                 package: '$(Pipeline.Workspace)/frontend-source'
                 runtimeStack: 'NODE|18-lts'
+                startUpCommand: 'npm install && npm start'
 
             # 🔧 CORREGIDO: URL con HTTPS y sintaxis correcta de variables
             - task: AzureCLI@2
