@@ -120,6 +120,8 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
+                StartupCommand: 'npm start' # Or 'node index.js' 
+
                 # 🛠️ FINAL FIX: Single-line string for appSettings to resolve BadRequest error.
                 appSettings: 'DB_HOST=$(DB_HOST) DB_USER=$(DB_USER) DB_PASS=$(DB_PASS) DB_NAME=$(DB_NAME)'
 
@@ -172,6 +174,8 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
+                StartupCommand: 'npm start' # Or 'node index.js' 
+
                 # 🛠️ FINAL FIX: Single-line string for appSettings to resolve BadRequest error.
                 appSettings: 'DB_HOST=$(DB_HOST) DB_USER=$(DB_USER) DB_PASS=$(DB_PASS) DB_NAME=$(DB_NAME)'
 
