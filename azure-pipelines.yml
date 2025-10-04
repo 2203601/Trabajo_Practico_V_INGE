@@ -118,9 +118,13 @@ stages:
   dependsOn: Deploy_QA
   condition: succeeded()
   jobs:
-  - job: Sync
+  - deployment: SyncData
     displayName: "Copiar coffeehub.db"
-    steps:
+    environment: 'PROD'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
       - task: AzureCLI@2
         displayName: "Sincronizar DB vía CLI (Kudu API)"
         inputs:
@@ -207,7 +211,8 @@ stages:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameProd)'
                 package: '$(Pipeline.Workspace)/frontend-source'
-                runtimeStack: 'NODE|18-lts'  
+                runtimeStack: 'NODE|18-lts'
+                startUpCommand: 'npm install && npm start'  
 
             - task: AzureCLI@2
               displayName: 'Configurar URL del Backend en Frontend PROD'
