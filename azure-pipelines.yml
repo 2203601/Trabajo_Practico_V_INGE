@@ -51,7 +51,7 @@ stages:
   dependsOn: Build
   condition: succeeded()
   variables:
-    QA_DB_HOST: 'qa-db-host'
+    QA_DB_HOST: 'localhost'
     QA_DB_USER: 'qa_user'
     QA_DB_PASS: 'qa_password'       # secreto
     QA_DB_NAME: 'coffeehub_qa'
@@ -83,7 +83,7 @@ stages:
     azureServiceConnection: 'azure-tp05-connection'
     backendAppName: 'Coffeehub-Back-QA'
     frontendAppName: 'Coffeehub-Front-QA'
-    DB_HOST: 'qa-db-host'
+    DB_HOST: 'localhost'
     DB_USER: 'qa_user'
     DB_PASS: 'qa_password'
     DB_NAME: 'coffeehub_qa'
