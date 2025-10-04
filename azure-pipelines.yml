@@ -57,7 +57,6 @@ stages:
         displayName: "Publicar Frontend"
 
 
----
 
 # ===============================
 # DEPLOY QA (Contenedor Único + Frontend)
@@ -99,7 +98,6 @@ stages:
                 runtimeStack: 'NODE|18-lts'
 
 
----
 
 # ---------------------------------
 # SINCRONIZACIÓN DE DATOS (Copia coffeehub.db)
