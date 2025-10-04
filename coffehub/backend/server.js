@@ -20,6 +20,7 @@ const PORT = process.env.PORT || 4000;
 // ================================
 const allowedOrigins = [
   "http://localhost:8080", // desarrollo local
+  "http://localhost:4000",
   "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net", // QA
   "https://coffeehub-front-prod.azurewebsites.net", // PROD
 ];
