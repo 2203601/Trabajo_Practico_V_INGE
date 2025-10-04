@@ -80,12 +80,10 @@ stages:
               package: '$(Pipeline.Workspace)/backend'
               runtimeStack: 'NODE|18-lts'
               appSettings: |
-                [
-                  { "name": "DB_HOST", "value": "$(DB_HOST)" },
-                  { "name": "DB_USER", "value": "$(DB_USER)" },
-                  { "name": "DB_PASS", "value": "$(DB_PASS)" },
-                  { "name": "DB_NAME", "value": "$(DB_NAME)" }
-                ]
+                DB_HOST=$(DB_HOST)
+                DB_USER=$(DB_USER)
+                DB_PASS=$(DB_PASS)
+                DB_NAME=$(DB_NAME)
 
           # 📦 Desplegar Frontend QA
           - task: AzureWebApp@1
@@ -133,12 +131,10 @@ stages:
               package: '$(Pipeline.Workspace)/backend'
               runtimeStack: 'NODE|18-lts'
               appSettings: |
-                [
-                  { "name": "DB_HOST", "value": "$(DB_HOST)" },
-                  { "name": "DB_USER", "value": "$(DB_USER)" },
-                  { "name": "DB_PASS", "value": "$(DB_PASS)" },
-                  { "name": "DB_NAME", "value": "$(DB_NAME)" }
-                ]
+                DB_HOST=$(DB_HOST)
+                DB_USER=$(DB_USER)
+                DB_PASS=$(DB_PASS)
+                DB_NAME=$(DB_NAME)
 
           # 📦 Desplegar Frontend PROD
           - task: AzureWebApp@1
