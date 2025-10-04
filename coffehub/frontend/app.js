@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:4000";
+const API_URL = ""; // <-- FIX: Use an empty string for relative paths
 
 // Toggle del formulario
 function toggleForm() {
@@ -8,7 +8,8 @@ function toggleForm() {
 
 // Renderizar cafés
 async function renderCoffees() {
-  const res = await fetch(`${API_URL}/coffees`);
+  // Now fetches data from the current host (e.g., https://coffeehub-back-qa.azurewebsites.net/coffees)
+  const res = await fetch(`${API_URL}/coffees`); 
   const coffees = await res.json();
   const grid = document.getElementById("coffee-grid");
 
