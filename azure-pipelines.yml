@@ -10,18 +10,20 @@ pool:
   name: SelfHosted
 
 variables:
-    # 🛑 🛠️ ACTUALIZAR ESTOS VALORES
-    RESOURCE_GROUP_NAME: 'tu-nombre-del-resource-group' 
+    # 🛑🛠️ 1. ACTUALIZAR: Nombre del Grupo de Recursos (Necesario para Azure CLI)
+    RESOURCE_GROUP_NAME: 'TPS-INGE-2025' 
+    # 🛑🛠️ 2. ACTUALIZAR: Nombre de tu conexión general de Azure (para App Services y CLI)
     azureServiceConnection: 'azure-tp05-connection'
+    # 🛑🛠️ 3. ACTUALIZAR: Nombre de la conexión al ACR (Docker Registry)
+    azureContainerRegistryConnection: 'azure-tp05-connection'
     
-    # Nombres de App Services (Backend: Contenedor, Frontend: Node)
+    # Nombres de App Services
     backendAppNameQA: 'Coffeehub-Back-QA'
     frontendAppNameQA: 'Coffeehub-Front-QA'
     backendAppNameProd: 'Coffeehub-Back-Prod'
     frontendAppNameProd: 'Coffeehub-Front-Prod'
     
-    # Nombre del registro de contenedores
-    azureContainerRegistry: 'tu_registro_docker_azure_service_connection' 
+    # Nombre del Repositorio/Imagen en ACR
     repositoryName: 'coffeehub-backend'
 
 
@@ -38,10 +40,11 @@ stages:
       - task: Docker@2
         displayName: 'Build and Push Backend Image'
         inputs:
-          containerRegistry: '$(azureContainerRegistry)' 
+          # 🛑🛠️ 4. USAR LA VARIABLE DE CONEXIÓN ACR CORREGIDA
+          containerRegistry: '$(azureContainerRegistryConnection)' 
           repository: '$(repositoryName)'
           command: 'buildAndPush'
-          Dockerfile: 'coffehub/backend/Dockerfile' # Debe instalar sqlite3
+          Dockerfile: 'coffehub/backend/Dockerfile' 
           tags: |
             $(Build.BuildId)
           buildContext: '.'
@@ -54,6 +57,7 @@ stages:
         displayName: "Publicar Frontend"
 
 
+---
 
 # ===============================
 # DEPLOY QA (Contenedor Único + Frontend)
@@ -73,10 +77,12 @@ stages:
             - task: AzureWebApp@1
               displayName: "Deploy Backend QA (Container)"
               inputs:
-                azureSubscription: 'azure-tp05-connection'
+                # 🛑🛠️ 5. USAR LA VARIABLE DE CONEXIÓN GENERAL
+                azureSubscription: '$(azureServiceConnection)' 
                 appName: '$(backendAppNameQA)'
                 appType: 'webAppContainer'
-                imageName: '$(azureContainerRegistry)/$(repositoryName):$(Build.BuildId)'
+                # 🛑🛠️ 6. ESPECIFICAR EL HOST DE ACR COMPLETO
+                imageName: '$(azureContainerRegistryConnection)/$(repositoryName):$(Build.BuildId)'
             
             # 2. Despliega el Frontend estático
             - task: DownloadPipelineArtifact@2
@@ -87,12 +93,13 @@ stages:
             - task: AzureWebApp@1
               displayName: "Deploy Frontend QA"
               inputs:
-                azureSubscription: 'azure-tp05-connection'
+                azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameQA)'
                 package: '$(Pipeline.Workspace)/frontend'
                 runtimeStack: 'NODE|18-lts'
 
 
+---
 
 # ---------------------------------
 # SINCRONIZACIÓN DE DATOS (Copia coffeehub.db)
@@ -126,9 +133,7 @@ stages:
             
             # 2. Subir el archivo coffeehub.db al App Service PROD (Sobrescribe la DB de PROD)
             echo "2. Subiendo DB a PROD ($TARGET_APP)..."
-            # Comprimimos el archivo para el despliegue
             zip -r db_transfer.zip $DB_FILE
-            # Usamos az webapp deploy para subir el archivo zip al directorio raíz del contenedor
             az webapp deploy --name $TARGET_APP --resource-group $RG --type zip --src-path db_transfer.zip --target-path '/home/site/wwwroot/'
             
             echo "✅ Datos de QA ($DB_FILE) copiados a PROD. Sincronización completada."
@@ -140,7 +145,7 @@ stages:
 # ===============================
 - stage: Deploy_PROD
   displayName: "Desplegar a Producción"
-  dependsOn: Sync_Data_QA_to_PROD # Se ejecuta DESPUÉS de la sincronización de datos
+  dependsOn: Sync_Data_QA_to_PROD 
   condition: succeeded()
   jobs:
   - deployment: DeployPROD
@@ -153,10 +158,10 @@ stages:
             - task: AzureWebApp@1
               displayName: "Deploy Backend PROD (Container)"
               inputs:
-                azureSubscription: 'azure-tp05-connection'
+                azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameProd)'
                 appType: 'webAppContainer'
-                imageName: '$(azureContainerRegistry)/$(repositoryName):$(Build.BuildId)'
+                imageName: '$(azureContainerRegistryConnection)/$(repositoryName):$(Build.BuildId)' # 🛑🛠️ USAR EL HOST DE ACR COMPLETO
 
             # 2. Despliega el Frontend estático
             - task: DownloadPipelineArtifact@2
@@ -167,7 +172,7 @@ stages:
             - task: AzureWebApp@1
               displayName: "Deploy Frontend PROD"
               inputs:
-                azureSubscription: 'azure-tp05-connection'
+                azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameProd)'
                 package: '$(Pipeline.Workspace)/frontend'
                 runtimeStack: 'NODE|18-lts'
