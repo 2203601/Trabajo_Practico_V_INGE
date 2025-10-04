@@ -2,13 +2,11 @@ trigger:
   branches:
     include:
     - main
-
-  pool:
-    name: SelfHosted
-
-  stages:
-    - stage: CI
-      displayName: "Continuous Integration"
+pool:
+  name: SelfHosted
+stages:
+- stage: CI
+  displayName: "Continuous Integration"
   jobs:
   - job: Backend
     displayName: "Backend CI"
