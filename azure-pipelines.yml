@@ -115,11 +115,7 @@ stages:
                   package: '$(Pipeline.Workspace)/backend'
                   runtimeStack: 'NODE|18-lts'
                   StartupCommand: 'npm start'
-                  appSettings: |
-                    DB_HOST=$(DB_HOST)
-                    DB_USER=$(DB_USER)
-                    DB_PASS=$(DB_PASS)
-                    DB_NAME=$(DB_NAME)
+                  appSettings: '-DB_HOST $(DB_HOST) -DB_USER $(DB_USER) -DB_PASS $(DB_PASS) -DB_NAME $(DB_NAME)'
 
               - task: AzureWebApp@1
                 displayName: "Deploy Frontend QA"
@@ -169,11 +165,7 @@ stages:
                   package: '$(Pipeline.Workspace)/backend'
                   runtimeStack: 'NODE|18-lts'
                   StartupCommand: 'npm start'
-                  appSettings: |
-                    DB_HOST=$(DB_HOST)
-                    DB_USER=$(DB_USER)
-                    DB_PASS=$(DB_PASS)
-                    DB_NAME=$(DB_NAME)
+                  appSettings: '-DB_HOST $(DB_HOST) -DB_USER $(DB_USER) -DB_PASS $(DB_PASS) -DB_NAME $(DB_NAME)'
 
               - task: AzureWebApp@1
                 displayName: "Deploy Frontend PROD"
