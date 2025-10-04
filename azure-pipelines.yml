@@ -111,7 +111,7 @@ stages:
                 scriptLocation: 'inlineScript'
                 inlineScript: |
                   # La variable 'BACKEND_URL' debe ser leída por tu código frontend.
-                  BACKEND_URL_VAL="https://$(backendAppNameQA).azurewebsites.net"
+                  BACKEND_URL_VAL="coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net"
                   FRONTEND_APP=$(frontendAppNameQA)
                   RG=$(RESOURCE_GROUP_NAME)
                   echo "Configurando BACKEND_URL en $FRONTEND_APP a $BACKEND_URL_VAL"
@@ -126,7 +126,7 @@ stages:
                 scriptLocation: 'inlineScript'
                 inlineScript: |
                   # El backend debe aceptar peticiones desde la URL del frontend.
-                  FRONTEND_URL_VAL="https://$(frontendAppNameQA).azurewebsites.net"
+                  FRONTEND_URL_VAL="https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net"
                   BACKEND_APP=$(backendAppNameQA)
                   RG=$(RESOURCE_GROUP_NAME)
                   echo "Configurando CORS en $BACKEND_APP para aceptar peticiones de $FRONTEND_URL_VAL"
