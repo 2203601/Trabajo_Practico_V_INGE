@@ -4,7 +4,12 @@ const mysql = require("mysql2");
 const path = require("path");
 
 const app = express();
-app.use(cors());
+// 🛠️ CORRECCIÓN: Configuración de CORS para permitir cualquier origen en entornos de Azure
+app.use(cors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+}));
 app.use(express.json());
 
 // 📌 Conexión a MySQL usando variables de entorno
@@ -99,6 +104,7 @@ app.get("/stats", (req, res) => {
 });
 
 // 📌 Servir frontend
+// Asegura que los archivos estáticos del frontend se sirvan desde la ruta raíz (/)
 app.use(express.static(path.join(__dirname, "../frontend")));
 
 const PORT = process.env.PORT || 4000;
