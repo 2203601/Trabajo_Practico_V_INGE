@@ -1,5 +1,5 @@
 # azure-pipelines.yml
-# Solución de Sincronización de Datos QA -> PROD (Costo Cero con SQLite y Docker)
+# Solución Final: Sincronización de Datos QA -> PROD usando SQLite + Build Directo en Azure
 
 trigger:
   branches:
@@ -10,60 +10,25 @@ pool:
   name: SelfHosted
 
 variables:
-    # 🛑🛠️ 1. ACTUALIZAR: Nombre del Grupo de Recursos (Necesario para Azure CLI)
+    # 🛑🛠️ 1. ACTUALIZAR: Nombre del Grupo de Recursos (CRÍTICO para Azure CLI)
     RESOURCE_GROUP_NAME: 'TPS-INGE-2025' 
-    # 🛑🛠️ 2. ACTUALIZAR: Nombre de tu conexión general de Azure (para App Services y CLI)
+    # 🛑🛠️ 2. ACTUALIZAR: Nombre de tu conexión general de Azure (es la única que tienes)
     azureServiceConnection: 'azure-tp05-connection'
-    # 🛑🛠️ 3. ACTUALIZAR: Nombre de la conexión al ACR (Docker Registry)
-    azureContainerRegistryConnection: 'azure-tp05-connection'
     
     # Nombres de App Services
     backendAppNameQA: 'Coffeehub-Back-QA'
     frontendAppNameQA: 'Coffeehub-Front-QA'
     backendAppNameProd: 'Coffeehub-Back-Prod'
     frontendAppNameProd: 'Coffeehub-Front-Prod'
-    
-    # Nombre del Repositorio/Imagen en ACR
-    repositoryName: 'coffeehub-backend'
 
 
 # ===============================
-# BUILD STAGE (Construye la Imagen Docker de SQLite)
+# BUILD STAGE (ELIMINADA) - Ahora el build se hace DENTRO de las etapas de Deploy.
 # ===============================
 stages:
-- stage: Build
-  displayName: "Build Docker Image (SQLite)"
-  jobs:
-  - job: BuildJob
-    steps:
-      # 1. Construir y Publicar la Imagen del Backend (Contiene el código SQLite)
-      - task: Docker@2
-        displayName: 'Build and Push Backend Image'
-        inputs:
-          # 🛑🛠️ 4. USAR LA VARIABLE DE CONEXIÓN ACR CORREGIDA
-          containerRegistry: '$(azureContainerRegistryConnection)' 
-          repository: '$(repositoryName)'
-          command: 'buildAndPush'
-          Dockerfile: 'coffehub/backend/Dockerfile' 
-          tags: |
-            $(Build.BuildId)
-          buildContext: '.'
-
-      # 2. Publicar el Frontend estático como artefacto
-      - task: PublishPipelineArtifact@1
-        inputs:
-          targetPath: 'coffehub/frontend'
-          artifact: 'frontend'
-        displayName: "Publicar Frontend"
-
-
-
-# ===============================
-# DEPLOY QA (Contenedor Único + Frontend)
-# ===============================
 - stage: Deploy_QA
   displayName: "Desplegar a QA"
-  dependsOn: Build
+  # Ya no depende de Build
   condition: succeeded()
   jobs:
   - deployment: DeployQA
@@ -72,18 +37,27 @@ stages:
       runOnce:
         deploy:
           steps:
-            # 1. Despliega la Imagen Docker del Backend (SQLite)
+            # 1. Despliega la Carpeta del Backend y Fuerza el Build/Run en Azure
+            # Esto construye la imagen Docker internamente y la ejecuta.
             - task: AzureWebApp@1
-              displayName: "Deploy Backend QA (Container)"
+              displayName: "Deploy Backend QA (Build Directo)"
               inputs:
-                # 🛑🛠️ 5. USAR LA VARIABLE DE CONEXIÓN GENERAL
-                azureSubscription: '$(azureServiceConnection)' 
+                azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameQA)'
                 appType: 'webAppContainer'
-                # 🛑🛠️ 6. ESPECIFICAR EL HOST DE ACR COMPLETO
-                imageName: '$(azureContainerRegistryConnection)/$(repositoryName):$(Build.BuildId)'
+                # Path de la carpeta que contiene el Dockerfile y server.js
+                package: '$(System.DefaultWorkingDirectory)/coffehub/backend' 
+                deploymentMethod: 'auto'
+                runtimeStack: 'DOCKER|CUSTOM' 
+                startUpCommand: 'sh -c "npm install && npm start"' 
             
             # 2. Despliega el Frontend estático
+            - task: PublishPipelineArtifact@1
+              inputs:
+                targetPath: 'coffehub/frontend'
+                artifact: 'frontend'
+              displayName: "Publicar Frontend QA para Descarga"
+
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'frontend'
@@ -122,14 +96,14 @@ stages:
             TARGET_APP=$(backendAppNameProd)
             RG=$(RESOURCE_GROUP_NAME)
             
-            # 1. Descargar el archivo coffeehub.db desde el App Service QA al Agente
+            # 1. Descargar el archivo coffeehub.db desde el App Service QA
             echo "1. Descargando DB de QA ($SOURCE_APP)..."
             az webapp log download --name $SOURCE_APP --resource-group $RG --log-file $DB_FILE --path '/home/site/wwwroot/$DB_FILE' || { 
               echo "Error: No se pudo descargar el archivo $DB_FILE. Asegúrese de que el archivo existe en QA." 
               exit 1 
             }
             
-            # 2. Subir el archivo coffeehub.db al App Service PROD (Sobrescribe la DB de PROD)
+            # 2. Subir el archivo coffeehub.db al App Service PROD (Sobrescribe)
             echo "2. Subiendo DB a PROD ($TARGET_APP)..."
             zip -r db_transfer.zip $DB_FILE
             az webapp deploy --name $TARGET_APP --resource-group $RG --type zip --src-path db_transfer.zip --target-path '/home/site/wwwroot/'
@@ -138,8 +112,9 @@ stages:
 
 
 
+
 # ===============================
-# DEPLOY PROD (Contenedor Único + Frontend)
+# DEPLOY PROD (Build Directo en Azure)
 # ===============================
 - stage: Deploy_PROD
   displayName: "Desplegar a Producción"
@@ -152,15 +127,19 @@ stages:
       runOnce:
         deploy:
           steps:
-            # 1. Despliega la Imagen Docker del Backend (que ahora usa la DB sincronizada)
+            # 1. Despliega la Carpeta del Backend y Fuerza el Build/Run en Azure
             - task: AzureWebApp@1
-              displayName: "Deploy Backend PROD (Container)"
+              displayName: "Deploy Backend PROD (Build Directo)"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameProd)'
                 appType: 'webAppContainer'
-                imageName: '$(azureContainerRegistryConnection)/$(repositoryName):$(Build.BuildId)' # 🛑🛠️ USAR EL HOST DE ACR COMPLETO
-
+                # Path de la carpeta que contiene el Dockerfile y server.js
+                package: '$(System.DefaultWorkingDirectory)/coffehub/backend' 
+                deploymentMethod: 'auto'
+                runtimeStack: 'DOCKER|CUSTOM'
+                startUpCommand: 'sh -c "npm install && npm start"'
+            
             # 2. Despliega el Frontend estático
             - task: DownloadPipelineArtifact@2
               inputs:
