@@ -54,7 +54,6 @@ stages:
         displayName: "Publicar Frontend"
 
 
----
 
 # ===============================
 # DEPLOY QA (Contenedor Único + Frontend)
@@ -94,7 +93,6 @@ stages:
                 runtimeStack: 'NODE|18-lts'
 
 
----
 
 # ---------------------------------
 # SINCRONIZACIÓN DE DATOS (Copia coffeehub.db)
@@ -136,7 +134,6 @@ stages:
             echo "✅ Datos de QA ($DB_FILE) copiados a PROD. Sincronización completada."
 
 
----
 
 # ===============================
 # DEPLOY PROD (Contenedor Único + Frontend)
