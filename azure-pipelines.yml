@@ -1,5 +1,5 @@
 # azure-pipelines.yml
-# YAML CORREGIDO: Conexión Backend-Frontend Funcional
+# YAML CORREGIDO: Conexión Backend-Frontend Funcional + Sync en PROD
 
 trigger:
   branches:
@@ -84,7 +84,6 @@ stages:
                 runtimeStack: 'NODE|18-lts'
                 startUpCommand: 'npm install && npm start'
 
-            # 🔧 CORREGIDO: URL con HTTPS y sintaxis correcta de variables
             - task: AzureCLI@2
               displayName: 'Configurar URL del Backend en Frontend QA'
               inputs:
@@ -98,7 +97,6 @@ stages:
                   echo "Configurando BACKEND_URL en $FRONTEND_APP a $BACKEND_URL_VAL"
                   az webapp config appsettings set --name "$FRONTEND_APP" --resource-group "$RG" --settings BACKEND_URL="$BACKEND_URL_VAL"
 
-            # 🔧 CORREGIDO: CORS con sintaxis correcta de variables
             - task: AzureCLI@2
               displayName: 'Configurar CORS en Backend QA'
               inputs:
@@ -125,51 +123,51 @@ stages:
       runOnce:
         deploy:
           steps:
-      - task: AzureCLI@2
-        displayName: "Sincronizar DB vía CLI (Kudu API)"
-        inputs:
-          azureSubscription: '$(azureServiceConnection)'
-          scriptType: 'bash'
-          scriptLocation: 'inlineScript'
-          inlineScript: |
-            DB_FILE='coffeehub.db'
-            SOURCE_APP='$(backendAppNameQA)'
-            TARGET_APP='$(backendAppNameProd)'
-            RG='$(RESOURCE_GROUP_NAME)'
-            
-            echo "Iniciando Sincronización (Descarga de $SOURCE_APP)..."
-            
-            CRED_JSON=$(az webapp deployment list-latest -n "$SOURCE_APP" -g "$RG" --query "[0].publishingProfile.details" -o json 2>/dev/null)
-            
-            if [ -z "$CRED_JSON" ] || ! command -v jq &> /dev/null; then
-                echo "##[warning]No se pudo obtener el perfil de publicación."
-                USERNAME=""
-                PASSWORD=""
-            else
-                USERNAME=$(echo $CRED_JSON | jq -r '.[0].userName')
-                PASSWORD=$(echo $CRED_JSON | jq -r '.[0].password')
-            fi
-            
-            KUDU_URL="https://${SOURCE_APP}.scm.azurewebsites.net/api/vfs/site/wwwroot/$DB_FILE"
-            
-            if [ -n "$USERNAME" ] && [ -n "$PASSWORD" ]; then
-                curl -u "$USERNAME:$PASSWORD" -o "$DB_FILE" "$KUDU_URL"
-            else
-                curl -o "$DB_FILE" "$KUDU_URL"
-            fi
+            - task: AzureCLI@2
+              displayName: "Sincronizar DB vía CLI (Kudu API)"
+              inputs:
+                azureSubscription: '$(azureServiceConnection)'
+                scriptType: 'bash'
+                scriptLocation: 'inlineScript'
+                inlineScript: |
+                  DB_FILE='coffeehub.db'
+                  SOURCE_APP='$(backendAppNameQA)'
+                  TARGET_APP='$(backendAppNameProd)'
+                  RG='$(RESOURCE_GROUP_NAME)'
+                  
+                  echo "Iniciando Sincronización (Descarga de $SOURCE_APP)..."
+                  
+                  CRED_JSON=$(az webapp deployment list-latest -n "$SOURCE_APP" -g "$RG" --query "[0].publishingProfile.details" -o json 2>/dev/null)
+                  
+                  if [ -z "$CRED_JSON" ] || ! command -v jq &> /dev/null; then
+                      echo "##[warning]No se pudo obtener el perfil de publicación."
+                      USERNAME=""
+                      PASSWORD=""
+                  else
+                      USERNAME=$(echo $CRED_JSON | jq -r '.[0].userName')
+                      PASSWORD=$(echo $CRED_JSON | jq -r '.[0].password')
+                  fi
+                  
+                  KUDU_URL="https://${SOURCE_APP}.scm.azurewebsites.net/api/vfs/site/wwwroot/$DB_FILE"
+                  
+                  if [ -n "$USERNAME" ] && [ -n "$PASSWORD" ]; then
+                      curl -u "$USERNAME:$PASSWORD" -o "$DB_FILE" "$KUDU_URL"
+                  else
+                      curl -o "$DB_FILE" "$KUDU_URL"
+                  fi
 
-            if [ ! -s "$DB_FILE" ]; then
-                echo "##[error]Error al descargar $DB_FILE."
-                exit 1 
-            fi
-            
-            echo "✅ Archivo $DB_FILE descargado exitosamente."
-            
-            zip -r db_transfer.zip $DB_FILE
-            
-            az webapp deploy --name "$TARGET_APP" --resource-group "$RG" --type zip --src-path db_transfer.zip --target-path '/home/site/wwwroot/'
-            
-            echo "✅ Datos de QA copiados a PROD."
+                  if [ ! -s "$DB_FILE" ]; then
+                      echo "##[error]Error al descargar $DB_FILE."
+                      exit 1 
+                  fi
+                  
+                  echo "✅ Archivo $DB_FILE descargado exitosamente."
+                  
+                  zip -r db_transfer.zip $DB_FILE
+                  
+                  az webapp deploy --name "$TARGET_APP" --resource-group "$RG" --type zip --src-path db_transfer.zip --target-path '/home/site/wwwroot/'
+                  
+                  echo "✅ Datos de QA copiados a PROD."
 
 
 - stage: Deploy_PROD
@@ -212,7 +210,7 @@ stages:
                 appName: '$(frontendAppNameProd)'
                 package: '$(Pipeline.Workspace)/frontend-source'
                 runtimeStack: 'NODE|18-lts'
-                startUpCommand: 'npm install && npm start'  
+                startUpCommand: 'npm install && npm start'
 
             - task: AzureCLI@2
               displayName: 'Configurar URL del Backend en Frontend PROD'
