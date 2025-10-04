@@ -46,7 +46,7 @@ stages:
 # ---------------------------------
 
 # ===============================
-# SYNC QA WITH PROD (CORREGIDO)
+# SYNC QA WITH PROD 
 # ===============================
 - stage: Sync_QA
   displayName: "Actualizar QA con datos de PROD"
@@ -59,7 +59,6 @@ stages:
     QA_DB_NAME: 'coffeehub_qa'
     PROD_DB_HOST: 'localhost'
     PROD_DB_USER: 'root'
-    # Password set to empty for local testing. Use a secret variable in production!
     PROD_DB_PASS: ''   
     PROD_DB_NAME: 'coffeehub'
   jobs:
@@ -70,7 +69,6 @@ stages:
           set -eux 
           echo "Sincronizando QA con PROD usando pipe y compresión..."
           
-          # Fix: Removed -p for mysqldump (PROD_DB_PASS is empty).
           mysqldump --single-transaction --verbose -h $(PROD_DB_HOST) -u $(PROD_DB_USER) $(PROD_DB_NAME) \
           | gzip \
           | gunzip \
@@ -120,10 +118,19 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
-                StartupCommand: 'npm start' # Or 'node index.js' 
-
-                # 🛠️ FINAL FIX: Single-line string for appSettings to resolve BadRequest error.
-                appSettings: 'DB_HOST=$(DB_HOST) DB_USER=$(DB_USER) DB_PASS=$(DB_PASS) DB_NAME=$(DB_NAME)'
+                StartupCommand: 'npm start' # Agregado para resolver el error de permisos/inicio
+                
+                # 🛠️ CORRECCIÓN FINAL: Usar formato de lista para forzar pares Key/Value
+                appSettings: |
+                  - name: DB_HOST
+                    value: $(DB_HOST)
+                  - name: DB_USER
+                    value: $(DB_USER)
+                    # Nota: Es crucial que DB_PASS sea un secreto de Azure Key Vault en un entorno real.
+                  - name: DB_PASS
+                    value: $(DB_PASS) 
+                  - name: DB_NAME
+                    value: $(DB_NAME)
 
             - task: AzureWebApp@1
               displayName: "Deploy Frontend QA"
@@ -132,7 +139,7 @@ stages:
                 appName: '$(frontendAppName)'
                 package: '$(Pipeline.Workspace)/frontend'
                 runtimeStack: 'NODE|18-lts'
-
+                # No StartupCommand para el frontend estático
 # ---------------------------------
 
 # ===============================
@@ -174,10 +181,18 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
-                StartupCommand: 'npm start' # Or 'node index.js' 
-
-                # 🛠️ FINAL FIX: Single-line string for appSettings to resolve BadRequest error.
-                appSettings: 'DB_HOST=$(DB_HOST) DB_USER=$(DB_USER) DB_PASS=$(DB_PASS) DB_NAME=$(DB_NAME)'
+                StartupCommand: 'npm start' # Agregado para resolver el error de permisos/inicio
+                
+                # 🛠️ CORRECCIÓN FINAL: Usar formato de lista para forzar pares Key/Value
+                appSettings: |
+                  - name: DB_HOST
+                    value: $(DB_HOST)
+                  - name: DB_USER
+                    value: $(DB_USER)
+                  - name: DB_PASS
+                    value: $(DB_PASS) 
+                  - name: DB_NAME
+                    value: $(DB_NAME)
 
             - task: AzureWebApp@1
               displayName: "Deploy Frontend PROD"
@@ -186,7 +201,7 @@ stages:
                 appName: '$(frontendAppName)'
                 package: '$(Pipeline.Workspace)/frontend'
                 runtimeStack: 'NODE|18-lts'
-
+                
             - script: |
                 echo "Aplicando migraciones en PROD..."
                 cd $(Pipeline.Workspace)/backend 
