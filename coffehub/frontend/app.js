@@ -1,4 +1,4 @@
-const API_URL = ""; // 🛠️ CORRECCIÓN: Usa una ruta relativa para funcionar en Azure
+const API_URL = window.BACKEND_URL || 'http://localhost:8080';
 
 // Toggle del formulario
 function toggleForm() {
@@ -8,7 +8,8 @@ function toggleForm() {
 
 // Renderizar cafés
 async function renderCoffees() {
-  const res = await fetch(`${API_URL}/coffees`);
+  // 🛑 Usando API_URL
+  const res = await fetch(`${API_URL}/api/products`);
   const coffees = await res.json();
   const grid = document.getElementById("coffee-grid");
 
@@ -34,6 +35,7 @@ async function renderCoffees() {
 
 // Actualizar estadísticas
 async function updateStats() {
+  // 🛑 Usando API_URL
   const res = await fetch(`${API_URL}/stats`);
   const stats = await res.json();
   document.getElementById("total-coffees").textContent = stats.total;
@@ -55,6 +57,7 @@ document.getElementById("coffee-form").addEventListener("submit", async (e) => {
     description: document.getElementById("description").value || "Sin descripción"
   };
 
+  // 🛑 Usando API_URL
   await fetch(`${API_URL}/coffees`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
