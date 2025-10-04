@@ -73,7 +73,7 @@ stages:
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'backend-code'
-                path: '$(Pipeline.Workspace)/backend-source' 
+                path: '$(Pipeline.Workspace)/backend' 
               displayName: "Descargar Código Backend"
 
             # 2. Despliega la Carpeta y Fuerza el Build/Run en Azure (Contenedor Docker)
@@ -84,7 +84,7 @@ stages:
                 appName: '$(backendAppNameQA)'
                 appType: 'webAppContainer'
                 # Path del código descargado que Azure usará para construir el Docker
-                package: '$(Pipeline.Workspace)/backend-source/coffehub/backend' 
+                package: '$(Pipeline.Workspace)/backend-source' 
                 deploymentMethod: 'auto'
                 runtimeStack: 'DOCKER|CUSTOM' 
                 startUpCommand: 'sh -c "npm install && npm start"' 
@@ -172,7 +172,7 @@ stages:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameProd)'
                 appType: 'webAppContainer'
-                package: '$(Pipeline.Workspace)/backend-source/coffehub/backend' 
+                package: '$(Pipeline.Workspace)/backend-source' 
                 deploymentMethod: 'auto'
                 runtimeStack: 'DOCKER|CUSTOM'
                 startUpCommand: 'sh -c "npm install && npm start"'
