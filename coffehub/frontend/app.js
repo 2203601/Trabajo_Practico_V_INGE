@@ -4,7 +4,7 @@
 const API_URL = window.BACKEND_URL || 
   (window.location.hostname === 'localhost' 
     ? 'http://localhost:4000' 
-    : 'https://coffeehub-backend-qa.azurewebsites.net'); // Cambiar a tu URL de Azure
+    : 'http://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net'); // Cambiar a tu URL de Azure
 
 console.log('🔗 API URL configurada:', API_URL);
 
