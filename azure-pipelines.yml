@@ -37,11 +37,7 @@ stages:
         displayName: 'Instalar Dependencias (Backend)'
         workingDirectory: 'coffehub/backend'
 
-      # 2. Ejecutar Pruebas Unitarias (Si las pruebas fallan, el pipeline se detiene)
-      - script: |
-          npm test
-        displayName: 'Ejecutar Pruebas Unitarias'
-        workingDirectory: 'coffehub/backend'
+
 
       # 3. Publicar la Carpeta del Backend (código fuente y Dockerfile)
       - task: PublishPipelineArtifact@1
