@@ -3,14 +3,13 @@ trigger:
     include:
       - main
 
-
 pool:
   name: SelfHosted
 
 stages:
-# 
+# ===============================
 # BUILD STAGE
-# 
+# ===============================
 - stage: Build
   displayName: "Build Backend & Frontend"
   jobs:
@@ -44,6 +43,7 @@ stages:
           artifact: 'frontend'
         displayName: "Publicar Frontend"
 
+# ---------------------------------
 
 # ===============================
 # SYNC QA WITH PROD (CORREGIDO)
@@ -59,7 +59,7 @@ stages:
     QA_DB_NAME: 'coffeehub_qa'
     PROD_DB_HOST: 'localhost'
     PROD_DB_USER: 'root'
-    # Se asume que no tiene contraseña. ¡Corregir esto en PROD real!
+    # Password set to empty for local testing. Use a secret variable in production!
     PROD_DB_PASS: ''   
     PROD_DB_NAME: 'coffeehub'
   jobs:
@@ -70,8 +70,7 @@ stages:
           set -eux 
           echo "Sincronizando QA con PROD usando pipe y compresión..."
           
-          # FIX 1: Se remueve -p de mysqldump porque la variable $(PROD_DB_PASS) está vacía.
-          # FIX 2: Se asegura la sintaxis correcta -pPASSWORD para el comando mysql de QA.
+          # Fix: Removed -p for mysqldump (PROD_DB_PASS is empty).
           mysqldump --single-transaction --verbose -h $(PROD_DB_HOST) -u $(PROD_DB_USER) $(PROD_DB_NAME) \
           | gzip \
           | gunzip \
@@ -80,7 +79,7 @@ stages:
           echo "Sincronización completada."
         displayName: "Dump PROD -> Restore QA (Corregido)"
 
-
+# ---------------------------------
 
 # ===============================
 # DEPLOY QA
@@ -121,12 +120,8 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
-                # 🚨 CORRECCIÓN CLAVE: Formato Key=Value, sin guiones (-).
-                appSettings: |
-                  DB_HOST=$(DB_HOST)
-                  DB_USER=$(DB_USER)
-                  DB_PASS=$(DB_PASS)
-                  DB_NAME=$(DB_NAME)
+                # 🛠️ FINAL FIX: Single-line string for appSettings to resolve BadRequest error.
+                appSettings: 'DB_HOST=$(DB_HOST) DB_USER=$(DB_USER) DB_PASS=$(DB_PASS) DB_NAME=$(DB_NAME)'
 
             - task: AzureWebApp@1
               displayName: "Deploy Frontend QA"
@@ -136,7 +131,7 @@ stages:
                 package: '$(Pipeline.Workspace)/frontend'
                 runtimeStack: 'NODE|18-lts'
 
-
+# ---------------------------------
 
 # ===============================
 # DEPLOY PROD
@@ -177,12 +172,8 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
-                # 🚨 CORRECCIÓN CLAVE: Formato Key=Value, sin guiones (-).
-                appSettings: |
-                  DB_HOST=$(DB_HOST)
-                  DB_USER=$(DB_USER)
-                  DB_PASS=$(DB_PASS)
-                  DB_NAME=$(DB_NAME)
+                # 🛠️ FINAL FIX: Single-line string for appSettings to resolve BadRequest error.
+                appSettings: 'DB_HOST=$(DB_HOST) DB_USER=$(DB_USER) DB_PASS=$(DB_PASS) DB_NAME=$(DB_NAME)'
 
             - task: AzureWebApp@1
               displayName: "Deploy Frontend PROD"
@@ -194,7 +185,6 @@ stages:
 
             - script: |
                 echo "Aplicando migraciones en PROD..."
-                # Ejecutando la migración desde el artefacto descargado
                 cd $(Pipeline.Workspace)/backend 
                 npx sequelize db:migrate
               displayName: "Migraciones PROD"
