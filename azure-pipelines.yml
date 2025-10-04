@@ -75,7 +75,7 @@ stages:
           - task: AzureWebApp@1
             displayName: "Deploy Backend QA"
             inputs:
-              azureSubscription: '$(azureServiceConnection)'
+              azureSubscription: 'azure-tp05-connection'
               appName: '$(backendAppName)'
               package: '$(Pipeline.Workspace)/backend'
               runtimeStack: 'NODE|18-lts'
@@ -91,7 +91,7 @@ stages:
           - task: AzureWebApp@1
             displayName: "Deploy Frontend QA"
             inputs:
-              azureSubscription: '$(azureServiceConnection)'
+              azureSubscription: 'azure-tp05-connection'
               appName: '$(frontendAppName)'
               package: '$(Pipeline.Workspace)/frontend'
               runtimeStack: 'NODE|18-lts'
@@ -128,7 +128,7 @@ stages:
           - task: AzureWebApp@1
             displayName: "Deploy Backend PROD"
             inputs:
-              azureSubscription: '$(azureServiceConnection)'
+              azureSubscription: 'azure-tp05-connection'
               appName: '$(backendAppName)'
               package: '$(Pipeline.Workspace)/backend'
               runtimeStack: 'NODE|18-lts'
@@ -144,7 +144,7 @@ stages:
           - task: AzureWebApp@1
             displayName: "Deploy Frontend PROD"
             inputs:
-              azureSubscription: '$(azureServiceConnection)'
+              azureSubscription: 'azure-tp05-connection'
               appName: '$(frontendAppName)'
               package: '$(Pipeline.Workspace)/frontend'
               runtimeStack: 'NODE|18-lts'
