@@ -13,40 +13,38 @@ stages:
 - stage: Build
   displayName: "Build Backend & Frontend"
   jobs:
-  - job: BuildJob
-    steps:
-      - task: NodeTool@0
-        inputs:
-          versionSpec: '18.x'
-        displayName: "Use Node.js 18"
+    - job: BuildJob
+      steps:
+        - task: NodeTool@0
+          inputs:
+            versionSpec: '18.x'
+          displayName: "Use Node.js 18"
 
-      - script: |
-          cd coffehub/backend
-          npm install
-        displayName: "Install backend dependencies"
+        - script: |
+            cd coffehub/backend
+            npm install
+          displayName: "Install backend dependencies"
 
-      - script: |
-          cd coffehub/frontend
-          npm install 
-          npm run build || echo "No build script definido"
-        displayName: "Build frontend"
+        - script: |
+            cd coffehub/frontend
+            npm install
+            npm run build || echo "No build script definido"
+          displayName: "Build frontend"
 
-      - task: PublishPipelineArtifact@1
-        inputs:
-          targetPath: 'coffehub/backend'
-          artifact: 'backend'
-        displayName: "Publicar Backend"
+        - task: PublishPipelineArtifact@1
+          inputs:
+            targetPath: 'coffehub/backend'
+            artifact: 'backend'
+          displayName: "Publicar Backend"
 
-      - task: PublishPipelineArtifact@1
-        inputs:
-          targetPath: 'coffehub/frontend'
-          artifact: 'frontend'
-        displayName: "Publicar Frontend"
-
-# ---------------------------------
+        - task: PublishPipelineArtifact@1
+          inputs:
+            targetPath: 'coffehub/frontend'
+            artifact: 'frontend'
+          displayName: "Publicar Frontend"
 
 # ===============================
-# SYNC QA WITH PROD 
+# SYNC QA WITH PROD
 # ===============================
 - stage: Sync_QA
   displayName: "Actualizar QA con datos de PROD"
@@ -62,22 +60,20 @@ stages:
     PROD_DB_PASS: ''   
     PROD_DB_NAME: 'coffeehub'
   jobs:
-  - job: SyncQA
-    displayName: "Sync QA Database Corrected"
-    steps:
-      - script: |
-          set -eux 
-          echo "Sincronizando QA con PROD usando pipe y compresión..."
-          
-          mysqldump --single-transaction --verbose -h $(PROD_DB_HOST) -u $(PROD_DB_USER) $(PROD_DB_NAME) \
-          | gzip \
-          | gunzip \
-          | mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p$(QA_DB_PASS) $(QA_DB_NAME)
-          
-          echo "Sincronización completada."
-        displayName: "Dump PROD -> Restore QA (Corregido)"
-
-# ---------------------------------
+    - job: SyncQA
+      displayName: "Sync QA Database Corrected"
+      steps:
+        - script: |
+            set -eux 
+            echo "Sincronizando QA con PROD usando pipe y compresión..."
+            
+            mysqldump --single-transaction --verbose -h $(PROD_DB_HOST) -u $(PROD_DB_USER) $(PROD_DB_NAME) \
+            | gzip \
+            | gunzip \
+            | mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p$(QA_DB_PASS) $(QA_DB_NAME)
+            
+            echo "Sincronización completada."
+          displayName: "Dump PROD -> Restore QA"
 
 # ===============================
 # DEPLOY QA
@@ -95,52 +91,43 @@ stages:
     DB_PASS: 'qa_password'
     DB_NAME: 'coffeehub_qa'
   jobs:
-  - deployment: DeployQA
-    environment: 'QA'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - task: DownloadPipelineArtifact@2
-              inputs:
-                artifact: 'backend'
-                path: '$(Pipeline.Workspace)/backend'
+    - deployment: DeployQA
+      environment: 'QA'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  artifact: 'backend'
+                  path: '$(Pipeline.Workspace)/backend'
 
-            - task: DownloadPipelineArtifact@2
-              inputs:
-                artifact: 'frontend'
-                path: '$(Pipeline.Workspace)/frontend'
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  artifact: 'frontend'
+                  path: '$(Pipeline.Workspace)/frontend'
 
-            - task: AzureWebApp@1
-              displayName: "Deploy Backend QA"
-              inputs:
-                azureSubscription: 'azure-tp05-connection'
-                appName: '$(backendAppName)'
-                package: '$(Pipeline.Workspace)/backend'
-                runtimeStack: 'NODE|18-lts'
-                StartupCommand: 'npm start' # Agregado para resolver el error de permisos/inicio
-                
-                # 🛠️ CORRECCIÓN FINAL: Usar formato de lista para forzar pares Key/Value
-                appSettings: |
-                  - name: DB_HOST
-                    value: $(DB_HOST)
-                  - name: DB_USER
-                    value: $(DB_USER)
-                    # Nota: Es crucial que DB_PASS sea un secreto de Azure Key Vault en un entorno real.
-                  - name: DB_PASS
-                    value: $(DB_PASS) 
-                  - name: DB_NAME
-                    value: $(DB_NAME)
+              - task: AzureWebApp@1
+                displayName: "Deploy Backend QA"
+                inputs:
+                  azureSubscription: 'azure-tp05-connection'
+                  appName: '$(backendAppName)'
+                  package: '$(Pipeline.Workspace)/backend'
+                  runtimeStack: 'NODE|18-lts'
+                  StartupCommand: 'npm start'
+                  appSettings: |
+                    DB_HOST=$(DB_HOST)
+                    DB_USER=$(DB_USER)
+                    DB_PASS=$(DB_PASS)
+                    DB_NAME=$(DB_NAME)
 
-            - task: AzureWebApp@1
-              displayName: "Deploy Frontend QA"
-              inputs:
-                azureSubscription: 'azure-tp05-connection'
-                appName: '$(frontendAppName)'
-                package: '$(Pipeline.Workspace)/frontend'
-                runtimeStack: 'NODE|18-lts'
-                # No StartupCommand para el frontend estático
-# ---------------------------------
+              - task: AzureWebApp@1
+                displayName: "Deploy Frontend QA"
+                inputs:
+                  azureSubscription: 'azure-tp05-connection'
+                  appName: '$(frontendAppName)'
+                  package: '$(Pipeline.Workspace)/frontend'
+                  runtimeStack: 'NODE|18-lts'
 
 # ===============================
 # DEPLOY PROD
@@ -155,55 +142,49 @@ stages:
     frontendAppName: 'Coffeehub-Front-Prod'
     DB_HOST: 'localhost'
     DB_USER: 'root'
-    DB_PASS: '' # Secreto de PROD.
+    DB_PASS: '' # Secreto de PROD
     DB_NAME: 'coffeehub'
   jobs:
-  - deployment: DeployPROD
-    environment: 'PROD'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - task: DownloadPipelineArtifact@2
-              inputs:
-                artifact: 'backend'
-                path: '$(Pipeline.Workspace)/backend'
+    - deployment: DeployPROD
+      environment: 'PROD'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  artifact: 'backend'
+                  path: '$(Pipeline.Workspace)/backend'
 
-            - task: DownloadPipelineArtifact@2
-              inputs:
-                artifact: 'frontend'
-                path: '$(Pipeline.Workspace)/frontend'
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  artifact: 'frontend'
+                  path: '$(Pipeline.Workspace)/frontend'
 
-            - task: AzureWebApp@1
-              displayName: "Deploy Backend PROD"
-              inputs:
-                azureSubscription: 'azure-tp05-connection'
-                appName: '$(backendAppName)'
-                package: '$(Pipeline.Workspace)/backend'
-                runtimeStack: 'NODE|18-lts'
-                StartupCommand: 'npm start' # Agregado para resolver el error de permisos/inicio
-                
-                # 🛠️ CORRECCIÓN FINAL: Usar formato de lista para forzar pares Key/Value
-                appSettings: |
-                  - name: DB_HOST
-                    value: $(DB_HOST)
-                  - name: DB_USER
-                    value: $(DB_USER)
-                  - name: DB_PASS
-                    value: $(DB_PASS) 
-                  - name: DB_NAME
-                    value: $(DB_NAME)
+              - task: AzureWebApp@1
+                displayName: "Deploy Backend PROD"
+                inputs:
+                  azureSubscription: 'azure-tp05-connection'
+                  appName: '$(backendAppName)'
+                  package: '$(Pipeline.Workspace)/backend'
+                  runtimeStack: 'NODE|18-lts'
+                  StartupCommand: 'npm start'
+                  appSettings: |
+                    DB_HOST=$(DB_HOST)
+                    DB_USER=$(DB_USER)
+                    DB_PASS=$(DB_PASS)
+                    DB_NAME=$(DB_NAME)
 
-            - task: AzureWebApp@1
-              displayName: "Deploy Frontend PROD"
-              inputs:
-                azureSubscription: 'azure-tp05-connection'
-                appName: '$(frontendAppName)'
-                package: '$(Pipeline.Workspace)/frontend'
-                runtimeStack: 'NODE|18-lts'
-                
-            - script: |
-                echo "Aplicando migraciones en PROD..."
-                cd $(Pipeline.Workspace)/backend 
-                npx sequelize db:migrate
-              displayName: "Migraciones PROD"
+              - task: AzureWebApp@1
+                displayName: "Deploy Frontend PROD"
+                inputs:
+                  azureSubscription: 'azure-tp05-connection'
+                  appName: '$(frontendAppName)'
+                  package: '$(Pipeline.Workspace)/frontend'
+                  runtimeStack: 'NODE|18-lts'
+
+              - script: |
+                  echo "Aplicando migraciones en PROD..."
+                  cd $(Pipeline.Workspace)/backend
+                  npx sequelize db:migrate
+                displayName: "Migraciones PROD"
