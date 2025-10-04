@@ -78,10 +78,10 @@ stages:
           
           # Se agrega --verbose para obtener feedback si se queda atascado.
           # Se usa el formato -pPASS sin espacio para mysqldump.
-          mysqldump --single-transaction --verbose -h $(PROD_DB_HOST) -u $(PROD_DB_USER) -p$(PROD_DB_PASS) $(PROD_DB_NAME) \
+          mysqldump --single-transaction --verbose -h $(PROD_DB_HOST) -u $(PROD_DB_USER) $(PROD_DB_NAME) \
           | gzip \
           | gunzip \
-          | mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p$(QA_DB_PASS) $(QA_DB_NAME)
+          | mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p $(QA_DB_PASS) $(QA_DB_NAME)
           
           echo "Sincronización completada."
         displayName: "Dump PROD -> Restore QA (Optimizado y Debug)"
