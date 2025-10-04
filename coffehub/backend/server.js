@@ -12,78 +12,108 @@ app.use(cors({
 app.use(express.json());
 
 // Conexión a SQLite
-const db = new sqlite3.Database(path.join(__dirname, 'coffeehub.db'), (err) => {
-  if (err) console.error("❌ Error conectando a SQLite:", err.message);
-  else console.log("✅ Conectado a la base de datos SQLite.");
-});
-
-db.connect((err) => {
+const dbPath = path.join(__dirname, 'coffeehub.db');
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
-    console.error("❌ Error conectando a MySQL:", err.message);
+    console.error("❌ Error conectando a SQLite:", err.message);
+    process.exit(1);
   } else {
-    console.log("✅ Conectado a MySQL en", process.env.DB_HOST || "localhost"); 
+    console.log("✅ Conectado a la base de datos SQLite en:", dbPath);
+    initializeDatabase();
   }
 });
 
-// 📌 Crear tabla si no existe
-db.query(`CREATE TABLE IF NOT EXISTS coffees (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  origin VARCHAR(100) NOT NULL,
-  type VARCHAR(50) NOT NULL,
-  price DECIMAL(10,2) NOT NULL,
-  roast VARCHAR(50) NOT NULL,
-  rating DECIMAL(2,1) NOT NULL,
-  description TEXT
-)`, (err) => {
-    if (err) console.error("❌ Error creando tabla:", err.message);
-});
-
-// 📌 Insertar cafés de ejemplo solo si la tabla está vacía
-db.query("SELECT COUNT(*) as count FROM coffees", (err, results) => {
+// Inicializar base de datos
+function initializeDatabase() {
+  // Crear tabla si no existe (Sintaxis SQLite)
+  db.run(`CREATE TABLE IF NOT EXISTS coffees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    type TEXT NOT NULL,
+    price REAL NOT NULL,
+    roast TEXT NOT NULL,
+    rating REAL NOT NULL,
+    description TEXT
+  )`, (err) => {
     if (err) {
-        console.error("❌ Error al contar cafés:", err.message);
-        return;
+      console.error("❌ Error creando tabla:", err.message);
+      return;
+    }
+    console.log("✅ Tabla 'coffees' verificada.");
+    insertSampleData();
+  });
+}
+
+// Insertar datos de ejemplo
+function insertSampleData() {
+  db.get("SELECT COUNT(*) as count FROM coffees", (err, row) => {
+    if (err) {
+      console.error("❌ Error al contar cafés:", err.message);
+      return;
     }
 
-    if (results[0].count === 0) {
-        const samples = [
-            ["Blue Mountain Supreme", "Jamaica", "Arábica", 85.99, "Medio", 4.9, "Notas suaves de chocolate y nuez."],
-            ["Ethiopian Yirgacheffe", "Etiopía", "Arábica", 24.99, "Claro", 4.7, "Café floral y afrutado con notas cítricas."],
-            ["Colombian Supremo", "Colombia", "Arábica", 18.50, "Medio", 4.6, "Equilibrio perfecto entre acidez y cuerpo."],
-            ["Brazilian Santos", "Brasil", "Arábica", 15.99, "Medio-Oscuro", 4.3, "Café suave y cremoso con notas de chocolate."],
-            ["Vietnamese Robusta", "Vietnam", "Robusta", 12.99, "Oscuro", 4.1, "Café intenso y fuerte, alto en cafeína."],
-            ["Hawaiian Kona", "Hawái", "Arábica", 65.00, "Medio", 4.8, "Café aromático con notas de mantequilla y especias."]
-        ];
+    if (row.count === 0) {
+      const samples = [
+        ["Blue Mountain Supreme", "Jamaica", "Arábica", 85.99, "Medio", 4.9, "Notas suaves de chocolate y nuez."],
+        ["Ethiopian Yirgacheffe", "Etiopía", "Arábica", 24.99, "Claro", 4.7, "Café floral y afrutado con notas cítricas."],
+        ["Colombian Supremo", "Colombia", "Arábica", 18.50, "Medio", 4.6, "Equilibrio perfecto entre acidez y cuerpo."],
+        ["Brazilian Santos", "Brasil", "Arábica", 15.99, "Medio-Oscuro", 4.3, "Café suave y cremoso con notas de chocolate."],
+        ["Vietnamese Robusta", "Vietnam", "Robusta", 12.99, "Oscuro", 4.1, "Café intenso y fuerte, alto en cafeína."],
+        ["Hawaiian Kona", "Hawái", "Arábica", 65.00, "Medio", 4.8, "Café aromático con notas de mantequilla y especias."]
+      ];
 
-        const sql = `INSERT INTO coffees (name, origin, type, price, roast, rating, description)
-                     VALUES ?`;
-        
-        db.query(sql, [samples], (err, result) => {
-            if (err) console.error("❌ Error insertando cafés:", err.message);
-            else console.log(`✅ ${result.affectedRows} cafés de ejemplo cargados.`);
+      const stmt = db.prepare(`INSERT INTO coffees (name, origin, type, price, roast, rating, description)
+                               VALUES (?, ?, ?, ?, ?, ?, ?)`);
+      
+      let insertedCount = 0;
+      samples.forEach((sample) => {
+        stmt.run(sample, (err) => {
+          if (err) console.error("❌ Error insertando café:", err.message);
+          else insertedCount++;
         });
-    }
-});
+      });
 
-// 📌 Endpoints API
-app.get("/coffees", (req, res) => {
-  db.query("SELECT * FROM coffees", (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results);
+      stmt.finalize((err) => {
+        if (err) console.error("❌ Error finalizando inserciones:", err.message);
+        else console.log(`✅ ${insertedCount} cafés de ejemplo cargados.`);
+      });
+    } else {
+      console.log(`ℹ️  Base de datos ya contiene ${row.count} cafés.`);
+    }
+  });
+}
+
+// 📌 ENDPOINTS API
+
+// GET /api/products - Obtener todos los cafés
+app.get("/api/products", (req, res) => {
+  db.all("SELECT * FROM coffees", (err, rows) => {
+    if (err) {
+      console.error("❌ Error obteniendo cafés:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
   });
 });
 
-app.post("/coffees", (req, res) => {
+// POST /api/products - Agregar un café
+app.post("/api/products", (req, res) => {
   const { name, origin, type, price, roast, rating, description } = req.body;
+  
   const sql = `INSERT INTO coffees (name, origin, type, price, roast, rating, description)
                VALUES (?, ?, ?, ?, ?, ?, ?)`;
-  db.query(sql, [name, origin, type, price, roast, rating, description], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ id: result.insertId, ...req.body });
+  
+  db.run(sql, [name, origin, type, price, roast, rating, description || "Sin descripción"], function(err) {
+    if (err) {
+      console.error("❌ Error insertando café:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ id: this.lastID, ...req.body });
   });
 });
 
+// GET /stats - Estadísticas de cafés
 app.get("/stats", (req, res) => {
   const statsQuery = `
     SELECT 
@@ -93,23 +123,55 @@ app.get("/stats", (req, res) => {
     FROM coffees
   `;
   
-  db.query(statsQuery, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+  db.get(statsQuery, (err, row) => {
+    if (err) {
+      console.error("❌ Error obteniendo estadísticas:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
     
-    const row = results[0];
-    const total = row.total;
-    const avgPrice = row.avgPrice ? parseFloat(row.avgPrice).toFixed(2) : 0;
+    const total = row.total || 0;
+    const avgPrice = row.avgPrice ? parseFloat(row.avgPrice).toFixed(2) : "0.00";
     const popularOrigin = row.popularOrigin || "-";
 
     res.json({ total, avgPrice, popularOrigin });
   });
 });
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    database: "SQLite"
+  });
+});
 
-// 📌 Servir frontend (Se mantiene la configuración para servir los archivos estáticos)
-app.use(express.static(path.join(__dirname, "../frontend")));
+// Servir archivos estáticos del frontend (opcional, solo para desarrollo local)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(express.static(path.join(__dirname, "../frontend")));
+}
+
+// Manejo de errores global
+app.use((err, req, res, next) => {
+  console.error("❌ Error no manejado:", err.stack);
+  res.status(500).json({ error: "Error interno del servidor" });
+});
+
+// Cerrar base de datos al terminar el proceso
+process.on('SIGINT', () => {
+  db.close((err) => {
+    if (err) console.error("❌ Error cerrando base de datos:", err.message);
+    else console.log("✅ Conexión a SQLite cerrada.");
+    process.exit(0);
+  });
+});
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`✅ CoffeeHub corriendo en http://localhost:${PORT}`);
+  console.log(`✅ CoffeeHub Backend corriendo en puerto ${PORT}`);
+  console.log(`📊 Endpoints disponibles:`);
+  console.log(`   GET  /api/products - Listar cafés`);
+  console.log(`   POST /api/products - Agregar café`);
+  console.log(`   GET  /stats - Estadísticas`);
+  console.log(`   GET  /api/health - Health check`);
 });
