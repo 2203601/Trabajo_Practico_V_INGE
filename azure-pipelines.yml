@@ -15,36 +15,36 @@ stages:
   jobs:
   - job: BuildJob
     steps:
-    - task: NodeTool@0
-      inputs:
-        versionSpec: '18.x'
-      displayName: "Use Node.js 18"
+      - task: NodeTool@0
+        inputs:
+          versionSpec: '18.x'
+        displayName: "Use Node.js 18"
 
-    - script: |
-        cd coffehub/backend
-        npm install
-      displayName: "Install backend dependencies"
+      - script: |
+          cd coffehub/backend
+          npm install
+        displayName: "Install backend dependencies"
 
-    - script: |
-        cd coffehub/frontend
-        npm install || true
-        npm run build || echo "No build script definido"
-      displayName: "Build frontend"
+      - script: |
+          cd coffehub/frontend
+          npm install || true
+          npm run build || echo "No build script definido"
+        displayName: "Build frontend"
 
-    - task: PublishPipelineArtifact@1
-      inputs:
-        targetPath: 'coffehub/backend'
-        artifact: 'backend'
-      displayName: "Publicar Backend"
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: 'coffehub/backend'
+          artifact: 'backend'
+        displayName: "Publicar Backend"
 
-    - task: PublishPipelineArtifact@1
-      inputs:
-        targetPath: 'coffehub/frontend'
-        artifact: 'frontend'
-      displayName: "Publicar Frontend"
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: 'coffehub/frontend'
+          artifact: 'frontend'
+        displayName: "Publicar Frontend"
 
 # ===============================
-# SYNC QA WITH PROD
+# SYNC QA WITH PROD (Optimizado)
 # ===============================
 - stage: Sync_QA
   displayName: "Actualizar QA con datos de PROD"
@@ -53,23 +53,24 @@ stages:
   variables:
     QA_DB_HOST: 'qa-db-host'
     QA_DB_USER: 'qa_user'
-    QA_DB_PASS: 'qa_password'
+    QA_DB_PASS: 'qa_password'       # secreto
     QA_DB_NAME: 'coffeehub_qa'
     PROD_DB_HOST: 'localhost'
     PROD_DB_USER: 'root'
-    PROD_DB_PASS: ''
+    PROD_DB_PASS: ''   # secreto
     PROD_DB_NAME: 'coffeehub'
   jobs:
   - job: SyncQA
-    displayName: "Sync QA Database"
+    displayName: "Sync QA Database Optimized"
     steps:
-    - script: |
-        echo "Dumping PROD database..."
-        mysqldump -h $(PROD_DB_HOST) -u $(PROD_DB_USER) -p$(PROD_DB_PASS) $(PROD_DB_NAME) > prod_dump.sql
-
-        echo "Restoring dump into QA..."
-        mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p$(QA_DB_PASS) $(QA_DB_NAME) < prod_dump.sql
-      displayName: "Dump PROD -> Restore QA"
+      - script: |
+          echo "Sincronizando QA con PROD usando pipe y compresión..."
+          mysqldump --single-transaction -h $(PROD_DB_HOST) -u $(PROD_DB_USER) -p$(PROD_DB_PASS) $(PROD_DB_NAME) \
+          | gzip \
+          | gunzip \
+          | mysql -h $(QA_DB_HOST) -u $(QA_DB_USER) -p$(QA_DB_PASS) $(QA_DB_NAME)
+          echo "Sincronización completada."
+        displayName: "Dump PROD -> Restore QA (Optimizado)"
 
 # ===============================
 # DEPLOY QA
@@ -93,36 +94,36 @@ stages:
       runOnce:
         deploy:
           steps:
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              artifact: 'backend'
-              path: '$(Pipeline.Workspace)/backend'
+            - task: DownloadPipelineArtifact@2
+              inputs:
+                artifact: 'backend'
+                path: '$(Pipeline.Workspace)/backend'
 
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              artifact: 'frontend'
-              path: '$(Pipeline.Workspace)/frontend'
+            - task: DownloadPipelineArtifact@2
+              inputs:
+                artifact: 'frontend'
+                path: '$(Pipeline.Workspace)/frontend'
 
-          - task: AzureWebApp@1
-            displayName: "Deploy Backend QA"
-            inputs:
-              azureSubscription: 'azure-tp05-connection'
-              appName: '$(backendAppName)'
-              package: '$(Pipeline.Workspace)/backend'
-              runtimeStack: 'NODE|18-lts'
-              appSettings: |
-                DB_HOST=$(DB_HOST)
-                DB_USER=$(DB_USER)
-                DB_PASS=$(DB_PASS)
-                DB_NAME=$(DB_NAME)
+            - task: AzureWebApp@1
+              displayName: "Deploy Backend QA"
+              inputs:
+                azureSubscription: 'azure-tp05-connection'
+                appName: '$(backendAppName)'
+                package: '$(Pipeline.Workspace)/backend'
+                runtimeStack: 'NODE|18-lts'
+                appSettings: |
+                  DB_HOST=$(DB_HOST)
+                  DB_USER=$(DB_USER)
+                  DB_PASS=$(DB_PASS)
+                  DB_NAME=$(DB_NAME)
 
-          - task: AzureWebApp@1
-            displayName: "Deploy Frontend QA"
-            inputs:
-              azureSubscription: 'azure-tp05-connection'
-              appName: '$(frontendAppName)'
-              package: '$(Pipeline.Workspace)/frontend'
-              runtimeStack: 'NODE|18-lts'
+            - task: AzureWebApp@1
+              displayName: "Deploy Frontend QA"
+              inputs:
+                azureSubscription: 'azure-tp05-connection'
+                appName: '$(frontendAppName)'
+                package: '$(Pipeline.Workspace)/frontend'
+                runtimeStack: 'NODE|18-lts'
 
 # ===============================
 # DEPLOY PROD
@@ -146,39 +147,39 @@ stages:
       runOnce:
         deploy:
           steps:
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              artifact: 'backend'
-              path: '$(Pipeline.Workspace)/backend'
+            - task: DownloadPipelineArtifact@2
+              inputs:
+                artifact: 'backend'
+                path: '$(Pipeline.Workspace)/backend'
 
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              artifact: 'frontend'
-              path: '$(Pipeline.Workspace)/frontend'
+            - task: DownloadPipelineArtifact@2
+              inputs:
+                artifact: 'frontend'
+                path: '$(Pipeline.Workspace)/frontend'
 
-          - task: AzureWebApp@1
-            displayName: "Deploy Backend PROD"
-            inputs:
-              azureSubscription: 'azure-tp05-connection'
-              appName: '$(backendAppName)'
-              package: '$(Pipeline.Workspace)/backend'
-              runtimeStack: 'NODE|18-lts'
-              appSettings: |
-                DB_HOST=$(DB_HOST)
-                DB_USER=$(DB_USER)
-                DB_PASS=$(DB_PASS)
-                DB_NAME=$(DB_NAME)
+            - task: AzureWebApp@1
+              displayName: "Deploy Backend PROD"
+              inputs:
+                azureSubscription: 'azure-tp05-connection'
+                appName: '$(backendAppName)'
+                package: '$(Pipeline.Workspace)/backend'
+                runtimeStack: 'NODE|18-lts'
+                appSettings: |
+                  DB_HOST=$(DB_HOST)
+                  DB_USER=$(DB_USER)
+                  DB_PASS=$(DB_PASS)
+                  DB_NAME=$(DB_NAME)
 
-          - task: AzureWebApp@1
-            displayName: "Deploy Frontend PROD"
-            inputs:
-              azureSubscription: 'azure-tp05-connection'
-              appName: '$(frontendAppName)'
-              package: '$(Pipeline.Workspace)/frontend'
-              runtimeStack: 'NODE|18-lts'
+            - task: AzureWebApp@1
+              displayName: "Deploy Frontend PROD"
+              inputs:
+                azureSubscription: 'azure-tp05-connection'
+                appName: '$(frontendAppName)'
+                package: '$(Pipeline.Workspace)/frontend'
+                runtimeStack: 'NODE|18-lts'
 
-          - script: |
-              echo "Aplicando migraciones en PROD..."
-              cd coffehub/backend
-              npx sequelize db:migrate
-            displayName: "Migraciones PROD"
+            - script: |
+                echo "Aplicando migraciones en PROD..."
+                cd coffehub/backend
+                npx sequelize db:migrate
+              displayName: "Migraciones PROD"
