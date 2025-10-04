@@ -43,6 +43,8 @@ stages:
           artifact: 'frontend'
         displayName: "Publicar Frontend"
 
+---
+
 # ===============================
 # SYNC QA WITH PROD (CORREGIDO)
 # ===============================
@@ -57,8 +59,7 @@ stages:
     QA_DB_NAME: 'coffeehub_qa'
     PROD_DB_HOST: 'localhost'
     PROD_DB_USER: 'root'
-    # Importante: PROD_DB_PASS debe ser un secreto válido en un entorno real.
-    # Se asume que no tiene contraseña para resolver el mysqldump, pero DEBE corregirse.
+    # Se asume que no tiene contraseña. ¡Corregir esto en PROD real!
     PROD_DB_PASS: ''   
     PROD_DB_NAME: 'coffeehub'
   jobs:
@@ -69,9 +70,8 @@ stages:
           set -eux 
           echo "Sincronizando QA con PROD usando pipe y compresión..."
           
-          # 🚨 CORRECCIÓN 1: Se elimina el -p para mysqldump porque la variable es vacía ('').
-          # 🚨 CORRECCIÓN 2: Se corrige la sintaxis de -p en el comando mysql para QA 
-          #                   (debe ser -pPASSWORD sin espacio).
+          # FIX 1: Se remueve -p de mysqldump porque la variable $(PROD_DB_PASS) está vacía.
+          # FIX 2: Se asegura la sintaxis correcta -pPASSWORD para el comando mysql de QA.
           mysqldump --single-transaction --verbose -h $(PROD_DB_HOST) -u $(PROD_DB_USER) $(PROD_DB_NAME) \
           | gzip \
           | gunzip \
@@ -79,6 +79,8 @@ stages:
           
           echo "Sincronización completada."
         displayName: "Dump PROD -> Restore QA (Corregido)"
+
+---
 
 # ===============================
 # DEPLOY QA
@@ -119,11 +121,12 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
+                # 🚨 CORRECCIÓN CLAVE: Formato Key=Value, sin guiones (-).
                 appSettings: |
-                  -DB_HOST $(DB_HOST)
-                  -DB_USER $(DB_USER)
-                  -DB_PASS $(DB_PASS)
-                  -DB_NAME $(DB_NAME)
+                  DB_HOST=$(DB_HOST)
+                  DB_USER=$(DB_USER)
+                  DB_PASS=$(DB_PASS)
+                  DB_NAME=$(DB_NAME)
 
             - task: AzureWebApp@1
               displayName: "Deploy Frontend QA"
@@ -132,6 +135,8 @@ stages:
                 appName: '$(frontendAppName)'
                 package: '$(Pipeline.Workspace)/frontend'
                 runtimeStack: 'NODE|18-lts'
+
+---
 
 # ===============================
 # DEPLOY PROD
@@ -146,7 +151,7 @@ stages:
     frontendAppName: 'Coffeehub-Front-Prod'
     DB_HOST: 'localhost'
     DB_USER: 'root'
-    DB_PASS: ''
+    DB_PASS: '' # Secreto de PROD.
     DB_NAME: 'coffeehub'
   jobs:
   - deployment: DeployPROD
@@ -172,11 +177,12 @@ stages:
                 appName: '$(backendAppName)'
                 package: '$(Pipeline.Workspace)/backend'
                 runtimeStack: 'NODE|18-lts'
+                # 🚨 CORRECCIÓN CLAVE: Formato Key=Value, sin guiones (-).
                 appSettings: |
-                  -DB_HOST $(DB_HOST)
-                  -DB_USER $(DB_USER)
-                  -DB_PASS $(DB_PASS)
-                  -DB_NAME $(DB_NAME)
+                  DB_HOST=$(DB_HOST)
+                  DB_USER=$(DB_USER)
+                  DB_PASS=$(DB_PASS)
+                  DB_NAME=$(DB_NAME)
 
             - task: AzureWebApp@1
               displayName: "Deploy Frontend PROD"
@@ -188,6 +194,7 @@ stages:
 
             - script: |
                 echo "Aplicando migraciones en PROD..."
+                # Ejecutando la migración desde el artefacto descargado
                 cd $(Pipeline.Workspace)/backend 
                 npx sequelize db:migrate
               displayName: "Migraciones PROD"
