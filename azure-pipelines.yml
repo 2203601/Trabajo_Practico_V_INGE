@@ -1,5 +1,5 @@
 # azure-pipelines.yml
-# Solución Final: Sincronización de Datos QA -> PROD usando SQLite + Build Directo en Azure
+# YAML FINAL: CI/CD Completo con Docker (Build en Azure), SQLite y Sincronización de Datos QA -> PROD
 
 trigger:
   branches:
@@ -23,12 +23,48 @@ variables:
 
 
 # ===============================
-# BUILD STAGE (ELIMINADA) - Ahora el build se hace DENTRO de las etapas de Deploy.
+# BUILD STAGE (INTEGRACIÓN CONTINUA: Instala, Prueba y Publica Código)
 # ===============================
 stages:
+- stage: Build
+  displayName: "CI: Instalar, Probar y Empaquetar"
+  jobs:
+  - job: BuildJob
+    steps:
+      # 1. Instalar dependencias del Backend (para pruebas y empaquetado)
+      - script: |
+          npm install
+        displayName: 'Instalar Dependencias (Backend)'
+        workingDirectory: 'coffehub/backend'
+
+      # 2. Ejecutar Pruebas Unitarias (Si las pruebas fallan, el pipeline se detiene)
+      - script: |
+          npm test
+        displayName: 'Ejecutar Pruebas Unitarias'
+        workingDirectory: 'coffehub/backend'
+
+      # 3. Publicar la Carpeta del Backend (código fuente y Dockerfile)
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: 'coffehub/backend'
+          artifact: 'backend-code' # Artefacto con el código fuente para el Build en Azure
+        displayName: "Publicar Código Backend"
+        
+      # 4. Publicar el Frontend estático
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: 'coffehub/frontend'
+          artifact: 'frontend-code'
+        displayName: "Publicar Código Frontend"
+
+
+
+# ===============================
+# DEPLOY QA (CD: Descarga el código y usa Build-on-Azure)
+# ===============================
 - stage: Deploy_QA
-  displayName: "Desplegar a QA"
-  # Ya no depende de Build
+  displayName: "CD: Desplegar a QA"
+  dependsOn: Build
   condition: succeeded()
   jobs:
   - deployment: DeployQA
@@ -37,38 +73,38 @@ stages:
       runOnce:
         deploy:
           steps:
-            # 1. Despliega la Carpeta del Backend y Fuerza el Build/Run en Azure
-            # Esto construye la imagen Docker internamente y la ejecuta.
+            # 1. Descargar el Código Fuente del Backend
+            - task: DownloadPipelineArtifact@2
+              inputs:
+                artifact: 'backend-code'
+                path: '$(Pipeline.Workspace)/backend-source' 
+              displayName: "Descargar Código Backend"
+
+            # 2. Despliega la Carpeta y Fuerza el Build/Run en Azure (Contenedor Docker)
             - task: AzureWebApp@1
               displayName: "Deploy Backend QA (Build Directo)"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameQA)'
                 appType: 'webAppContainer'
-                # Path de la carpeta que contiene el Dockerfile y server.js
-                package: '$(System.DefaultWorkingDirectory)/coffehub/backend' 
+                # Path del código descargado que Azure usará para construir el Docker
+                package: '$(Pipeline.Workspace)/backend-source/coffehub/backend' 
                 deploymentMethod: 'auto'
                 runtimeStack: 'DOCKER|CUSTOM' 
                 startUpCommand: 'sh -c "npm install && npm start"' 
             
-            # 2. Despliega el Frontend estático
-            - task: PublishPipelineArtifact@1
-              inputs:
-                targetPath: 'coffehub/frontend'
-                artifact: 'frontend'
-              displayName: "Publicar Frontend QA para Descarga"
-
+            # 3. Despliega el Frontend estático
             - task: DownloadPipelineArtifact@2
               inputs:
-                artifact: 'frontend'
-                path: '$(Pipeline.Workspace)/frontend'
+                artifact: 'frontend-code'
+                path: '$(Pipeline.Workspace)/frontend-source'
 
             - task: AzureWebApp@1
               displayName: "Deploy Frontend QA"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameQA)'
-                package: '$(Pipeline.Workspace)/frontend'
+                package: '$(Pipeline.Workspace)/frontend-source/coffehub/frontend'
                 runtimeStack: 'NODE|18-lts'
 
 
@@ -96,7 +132,7 @@ stages:
             TARGET_APP=$(backendAppNameProd)
             RG=$(RESOURCE_GROUP_NAME)
             
-            # 1. Descargar el archivo coffeehub.db desde el App Service QA
+            # 1. Descargar el archivo coffeehub.db
             echo "1. Descargando DB de QA ($SOURCE_APP)..."
             az webapp log download --name $SOURCE_APP --resource-group $RG --log-file $DB_FILE --path '/home/site/wwwroot/$DB_FILE' || { 
               echo "Error: No se pudo descargar el archivo $DB_FILE. Asegúrese de que el archivo existe en QA." 
@@ -112,12 +148,11 @@ stages:
 
 
 
-
 # ===============================
-# DEPLOY PROD (Build Directo en Azure)
+# DEPLOY PROD (CD: Descarga el código y usa Build-on-Azure)
 # ===============================
 - stage: Deploy_PROD
-  displayName: "Desplegar a Producción"
+  displayName: "CD: Desplegar a Producción"
   dependsOn: Sync_Data_QA_to_PROD 
   condition: succeeded()
   jobs:
@@ -127,29 +162,35 @@ stages:
       runOnce:
         deploy:
           steps:
-            # 1. Despliega la Carpeta del Backend y Fuerza el Build/Run en Azure
+            # 1. Descargar el Código Fuente del Backend
+            - task: DownloadPipelineArtifact@2
+              inputs:
+                artifact: 'backend-code'
+                path: '$(Pipeline.Workspace)/backend-source'
+              displayName: "Descargar Código Backend"
+
+            # 2. Despliega la Carpeta y Fuerza el Build/Run en Azure
             - task: AzureWebApp@1
               displayName: "Deploy Backend PROD (Build Directo)"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameProd)'
                 appType: 'webAppContainer'
-                # Path de la carpeta que contiene el Dockerfile y server.js
-                package: '$(System.DefaultWorkingDirectory)/coffehub/backend' 
+                package: '$(Pipeline.Workspace)/backend-source/coffehub/backend' 
                 deploymentMethod: 'auto'
                 runtimeStack: 'DOCKER|CUSTOM'
                 startUpCommand: 'sh -c "npm install && npm start"'
             
-            # 2. Despliega el Frontend estático
+            # 3. Despliega el Frontend estático
             - task: DownloadPipelineArtifact@2
               inputs:
-                artifact: 'frontend'
-                path: '$(Pipeline.Workspace)/frontend'
+                artifact: 'frontend-code'
+                path: '$(Pipeline.Workspace)/frontend-source'
 
             - task: AzureWebApp@1
               displayName: "Deploy Frontend PROD"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameProd)'
-                package: '$(Pipeline.Workspace)/frontend'
+                package: '$(Pipeline.Workspace)/frontend-source/coffehub/frontend'
                 runtimeStack: 'NODE|18-lts'
