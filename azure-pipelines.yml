@@ -2,6 +2,7 @@
 # COFFEEHUB CI/CD - QA y PRODUCCIÓN (Azure + MongoDB)
 # ===========================================
 
+
 trigger:
   branches:
     include:
