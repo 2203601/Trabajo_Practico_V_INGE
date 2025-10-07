@@ -11,7 +11,14 @@ const PORT = process.env.PORT || 4000;
 // ================================
 // 🔗 MongoDB Connection
 // ================================
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://coffeehub_user:coffeehub@cluster0.3ozasn4.mongodb.net/coffeehub?retryWrites=true&w=majority&appName=Cluster0";
+// Ahora usa MONGODB_URI desde variables de entorno
+// Cada ambiente (QA/PROD) tendrá su propia URI configurada en Azure
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error("❌ ERROR: MONGODB_URI no está definida");
+  process.exit(1);
+}
 
 let db;
 let productsCollection;
@@ -20,9 +27,13 @@ async function connectDB() {
   try {
     const client = new MongoClient(MONGODB_URI);
     await client.connect();
-    db = client.db("coffeehub");
+    
+    // El nombre de la base de datos viene en la URI
+    const dbName = new URL(MONGODB_URI).pathname.substring(1).split('?')[0];
+    db = client.db(dbName);
     productsCollection = db.collection("products");
-    console.log("✅ Conectado a MongoDB Atlas");
+    
+    console.log(`✅ Conectado a MongoDB Atlas - Base de datos: ${dbName}`);
   } catch (error) {
     console.error("❌ Error conectando a MongoDB:", error);
     process.exit(1);
@@ -36,7 +47,7 @@ const allowedOrigins = [
   "http://localhost:8080",
   "http://localhost:4000",
   "https://coffeehub-front-qa-argqggbvc3g0gkdc.brazilsouth-01.azurewebsites.net",
-  "https://coffeehub-front-prod.azurewebsites.net",
+  "https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net",
 ];
 
 app.use(cors({
@@ -65,7 +76,8 @@ app.get("/api/health", (req, res) => {
   res.json({ 
     status: "ok", 
     timestamp: new Date().toISOString(),
-    database: db ? "connected" : "disconnected"
+    database: db ? "connected" : "disconnected",
+    environment: process.env.NODE_ENV || "development"
   });
 });
 
