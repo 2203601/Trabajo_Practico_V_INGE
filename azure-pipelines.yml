@@ -5,7 +5,7 @@
 trigger:
   branches:
     include:
-      - main
+      - main3
 
 pool:
   name: SelfHosted
@@ -203,7 +203,7 @@ stages:
                 scriptType: 'bash'
                 scriptLocation: 'inlineScript'
                 inlineScript: |
-                  BACKEND_URL_VAL="https://$(backendAppNameProd).azurewebsites.net"
+                  BACKEND_URL_VAL="https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net"
                   FRONTEND_APP='$(frontendAppNameProd)'
                   RG='$(RESOURCE_GROUP_NAME)'
                   echo "➡️ Configurando BACKEND_URL en $FRONTEND_APP"
@@ -216,7 +216,7 @@ stages:
                 scriptType: 'bash'
                 scriptLocation: 'inlineScript'
                 inlineScript: |
-                  FRONTEND_URL_VAL="https://$(frontendAppNameProd).azurewebsites.net"
+                  FRONTEND_URL_VAL="https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net"
                   BACKEND_APP='$(backendAppNameProd)'
                   RG='$(RESOURCE_GROUP_NAME)'
                   echo "➡️ Configurando CORS en $BACKEND_APP"
