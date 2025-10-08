@@ -12,14 +12,19 @@ pool:
   name: SelfHosted
 
 variables:
-  group: CoffeeHub-Secrets
-  RESOURCE_GROUP_NAME: 'TPS-INGE-2025'
-  azureServiceConnection: 'azure-tp05-connection'
-  
-  backendAppNameQA: 'Coffeehub-Back-QA'
-  frontendAppNameQA: 'Coffeehub-Front-QA'
-  backendAppNameProd: 'Coffeehub-Back-Prod'
-  frontendAppNameProd: 'Coffeehub-Front-Prod'
+  - group: CoffeeHub-Secrets  # ⚠️ CAMBIO CRÍTICO: Agregar guion antes de "group"
+  - name: RESOURCE_GROUP_NAME
+    value: 'TPS-INGE-2025'
+  - name: azureServiceConnection
+    value: 'azure-tp05-connection'
+  - name: backendAppNameQA
+    value: 'Coffeehub-Back-QA'
+  - name: frontendAppNameQA
+    value: 'Coffeehub-Front-QA'
+  - name: backendAppNameProd
+    value: 'Coffeehub-Back-Prod'
+  - name: frontendAppNameProd
+    value: 'Coffeehub-Front-Prod'
   
   # Variables de MongoDB - deben estar en Azure DevOps Variable Groups
   # MONGODB_URI_QA: 'mongodb+srv://user:pass@cluster.mongodb.net/coffeehub_qa?retryWrites=true&w=majority'
