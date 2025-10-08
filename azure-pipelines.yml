@@ -12,7 +12,7 @@ pool:
   name: SelfHosted
 
 variables:
-  - group: CoffeeHub-Secrets  # ⚠️ CAMBIO CRÍTICO: Agregar guion antes de "group"
+  - group: CoffeeHub-Secrets  
   - name: RESOURCE_GROUP_NAME
     value: 'TPS-INGE-2025'
   - name: azureServiceConnection

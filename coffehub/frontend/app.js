@@ -51,7 +51,6 @@ async function renderCoffees() {
         <h3 class="coffee-name">${c.name}</h3>
         <div class="coffee-details">
           <div><b>Origen:</b> ${c.origin}</div>
-          <div><b>Tipo:</b> ${c.type}</div>
           <div><b>Precio:</b> $${c.price}/lb</div>
           <div><b>Tostado:</b> ${c.roast}</div>
           <div><b>Calificación:</b> ⭐ ${c.rating}/5</div>
