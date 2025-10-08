@@ -87,13 +87,14 @@ stages:
                 scriptLocation: 'inlineScript'
                 inlineScript: |
                   BACKEND_APP='$(backendAppNameQA)'
-                  RG='$(RESOURCE_GROUP_NAME)'
+                  RG='$(RESOURCE_GROUP_NAME)' 
                   echo "➡️ Configurando MongoDB QA en $BACKEND_APP"
+                  echo "MongoDB URI QA: $(MONGODB_URI_QA)"  # Debug line
                   az webapp config appsettings set \
                     --name "$BACKEND_APP" \
                     --resource-group "$RG" \
                     --settings \
-                      MONGODB_URI="$(MONGODB_URI_QA)" \
+                      MONGODB_URI='$(MONGODB_URI_QA)' \
                       NODE_ENV="qa"
 
             # ---- Frontend ----
@@ -183,11 +184,12 @@ stages:
                   BACKEND_APP='$(backendAppNameProd)'
                   RG='$(RESOURCE_GROUP_NAME)'
                   echo "➡️ Configurando MongoDB PROD en $BACKEND_APP"
+                  echo "MongoDB URI PROD: $(MONGODB_URI_PROD)"  # Debug line
                   az webapp config appsettings set \
                     --name "$BACKEND_APP" \
                     --resource-group "$RG" \
                     --settings \
-                      MONGODB_URI="$(MONGODB_URI_PROD)" \
+                      MONGODB_URI='$(MONGODB_URI_PROD)' \
                       NODE_ENV="production"
 
             # ---- Frontend ----
