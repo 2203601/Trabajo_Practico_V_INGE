@@ -1,7 +1,6 @@
 // ================================
 // ☕ CoffeeHub Backend - MongoDB
 // ================================
-// probando 
 import express from "express";
 import cors from "cors";
 import { MongoClient, ObjectId } from "mongodb";
@@ -12,8 +11,6 @@ const PORT = process.env.PORT || 4000;
 // ================================
 // 🔗 MongoDB Connection
 // ================================
-// Ahora usa MONGODB_URI desde variables de entorno
-// Cada ambiente (QA/PROD) tendrá su propia URI configurada en Azure
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
@@ -93,6 +90,28 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
+// GET un producto por ID
+app.get("/api/products/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    
+    const product = await productsCollection.findOne({ _id: new ObjectId(id) });
+    
+    if (!product) {
+      return res.status(404).json({ error: "Producto no encontrado" });
+    }
+    
+    res.json(product);
+  } catch (err) {
+    console.error("Error al obtener producto:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
 // POST agregar producto
 app.post("/api/products", async (req, res) => {
   const { name, origin, type, price, roast, rating, description } = req.body;
@@ -117,6 +136,72 @@ app.post("/api/products", async (req, res) => {
   } catch (err) {
     console.error("Error al insertar producto:", err);
     res.status(500).json({ error: "Error al crear producto" });
+  }
+});
+
+// PUT actualizar producto
+app.put("/api/products/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, origin, type, price, roast, rating, description } = req.body;
+    
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    
+    const updateData = {
+      name,
+      origin,
+      type,
+      price: parseFloat(price),
+      roast,
+      rating: parseFloat(rating),
+      description: description || "Sin descripción",
+      updatedAt: new Date()
+    };
+    
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "Producto no encontrado" });
+    }
+    
+    res.json({ 
+      _id: id,
+      ...updateData,
+      message: "Producto actualizado exitosamente" 
+    });
+  } catch (err) {
+    console.error("Error al actualizar producto:", err);
+    res.status(500).json({ error: "Error al actualizar producto" });
+  }
+});
+
+// DELETE eliminar producto
+app.delete("/api/products/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    
+    const result = await productsCollection.deleteOne({ _id: new ObjectId(id) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Producto no encontrado" });
+    }
+    
+    res.json({ 
+      message: "Producto eliminado exitosamente",
+      deletedId: id 
+    });
+  } catch (err) {
+    console.error("Error al eliminar producto:", err);
+    res.status(500).json({ error: "Error al eliminar producto" });
   }
 });
 
