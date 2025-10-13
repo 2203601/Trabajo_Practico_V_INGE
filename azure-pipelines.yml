@@ -1,6 +1,6 @@
 # ===========================================
 # COFFEEHUB CI/CD - QA y PRODUCCIÓN (Azure + MongoDB)
-# Base de datos separada por ambiente
+# Con Tests Automáticos Integrados
 # ===========================================
 
 trigger:
@@ -25,41 +25,87 @@ variables:
     value: 'Coffeehub-Back-Prod'
   - name: frontendAppNameProd
     value: 'Coffeehub-Front-Prod'
-  
-  # Variables de MongoDB - deben estar en Azure DevOps Variable Groups
-  # MONGODB_URI_QA: 'mongodb+srv://user:pass@cluster.mongodb.net/coffeehub_qa?retryWrites=true&w=majority'
-  # MONGODB_URI_PROD: 'mongodb+srv://user:pass@cluster.mongodb.net/coffeehub_prod?retryWrites=true&w=majority'
 
-# -------------------- STAGE 1: BUILD --------------------
+# ==================== STAGE 1: BUILD Y TESTS ====================
 stages:
-- stage: Build
+- stage: Build_And_Test
   displayName: "CI: Instalar, Probar y Empaquetar"
   jobs:
-  - job: BuildJob
-    displayName: "Construir Backend y Frontend"
+  - job: BuildAndTestBackend
+    displayName: "🔨 Build + Tests Backend"
     steps:
+      # ---- Instalar dependencias ----
       - script: |
+          echo "📦 Instalando dependencias del backend..."
           npm install
-        displayName: 'Instalar Dependencias (Backend)'
+        displayName: '📦 Instalar Dependencias Backend'
         workingDirectory: 'coffehub/backend'
 
+      # ---- Ejecutar Tests Unitarios ----
+      - script: |
+          echo "🧪 Ejecutando tests unitarios con mocks..."
+          npm run test:ci
+        displayName: '🧪 Tests Unitarios'
+        workingDirectory: 'coffehub/backend'
+        continueOnError: false
+
+      # ---- Publicar Resultados de Tests ----
+      - task: PublishTestResults@2
+        displayName: '📋 Publicar Resultados de Tests'
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '**/junit.xml'
+          searchFolder: 'coffehub/backend'
+          mergeTestResults: true
+          failTaskOnFailedTests: true
+          testRunTitle: 'Backend Tests'
+        condition: succeededOrFailed()
+
+      # ---- Publicar Coverage ----
+      - task: PublishCodeCoverageResults@1
+        displayName: '📊 Publicar Code Coverage'
+        inputs:
+          codeCoverageTool: 'Cobertura'
+          summaryFileLocation: 'coffehub/backend/coverage/cobertura-coverage.xml'
+          reportDirectory: 'coffehub/backend/coverage'
+        condition: succeededOrFailed()
+
+      # ---- Publicar Artefacto Backend ----
       - task: PublishPipelineArtifact@1
         inputs:
           targetPath: 'coffehub/backend'
           artifact: 'backend-code'
-        displayName: "Publicar Código Backend"
-        
+        displayName: "📦 Publicar Código Backend"
+        condition: succeeded()
+
+  - job: BuildFrontend
+    displayName: "🔨 Build Frontend"
+    steps:
+      - script: |
+          echo "📦 Instalando dependencias del frontend..."
+          npm install
+        displayName: '📦 Instalar Dependencias Frontend'
+        workingDirectory: 'coffehub/frontend'
+
+      # ---- Tests del Frontend (si los tienes) ----
+      # - script: |
+      #     echo "🧪 Ejecutando tests del frontend..."
+      #     npm test
+      #   displayName: '🧪 Tests Frontend'
+      #   workingDirectory: 'coffehub/frontend'
+      #   continueOnError: false
+
       - task: PublishPipelineArtifact@1
         inputs:
           targetPath: 'coffehub/frontend'
           artifact: 'frontend-code'
-        displayName: "Publicar Código Frontend"
+        displayName: "📦 Publicar Código Frontend"
 
 
-# -------------------- STAGE 2: DEPLOY QA --------------------
+# ==================== STAGE 2: DEPLOY QA ====================
 - stage: Deploy_QA
-  displayName: "CD: Desplegar QA + Configurar Entorno"
-  dependsOn: Build
+  displayName: "CD: Desplegar QA + Smoke Tests"
+  dependsOn: Build_And_Test
   condition: succeeded()
   jobs:
   - deployment: DeployQA
@@ -68,14 +114,14 @@ stages:
       runOnce:
         deploy:
           steps:
-            # ---- Backend ----
+            # ---- Backend QA ----
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'backend-code'
                 path: '$(Pipeline.Workspace)/backend-source' 
 
             - task: AzureWebApp@1
-              displayName: "Deploy Backend QA"
+              displayName: "🚀 Deploy Backend QA"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameQA)'
@@ -83,9 +129,9 @@ stages:
                 runtimeStack: 'NODE|18-lts'
                 startUpCommand: 'npm install && npm start'
 
-            # ---- Configurar MongoDB QA en Backend ----
+            # ---- Configurar MongoDB QA ----
             - task: AzureCLI@2
-              displayName: 'Configurar MONGODB_URI_QA en Backend QA'
+              displayName: '⚙️ Configurar MONGODB_URI_QA en Backend'
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 scriptType: 'bash'
@@ -101,14 +147,14 @@ stages:
                       MONGODB_URI="$(MONGODB_URI_QA)" \
                       NODE_ENV="qa"
 
-            # ---- Frontend ----
+            # ---- Frontend QA ----
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'frontend-code'
                 path: '$(Pipeline.Workspace)/frontend-source'
 
             - task: AzureWebApp@1
-              displayName: "Deploy Frontend QA"
+              displayName: "🚀 Deploy Frontend QA"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameQA)'
@@ -116,9 +162,9 @@ stages:
                 runtimeStack: 'NODE|18-lts'
                 startUpCommand: 'npm install && npm start'
 
-            # ---- Configuración QA ----
+            # ---- Configurar Frontend QA ----
             - task: AzureCLI@2
-              displayName: 'Configurar BACKEND_URL en Frontend QA'
+              displayName: '⚙️ Configurar BACKEND_URL en Frontend QA'
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 scriptType: 'bash'
@@ -133,8 +179,9 @@ stages:
                     --resource-group "$RG" \
                     --settings BACKEND_URL="$BACKEND_URL_VAL"
 
+            # ---- Configurar CORS QA ----
             - task: AzureCLI@2
-              displayName: 'Configurar CORS en Backend QA'
+              displayName: '⚙️ Configurar CORS en Backend QA'
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 scriptType: 'bash'
@@ -149,10 +196,36 @@ stages:
                     --resource-group "$RG" \
                     --allowed-origins "$FRONTEND_URL_VAL"
 
+            # ---- Smoke Tests QA ----
+            - script: |
+                echo "🔍 Ejecutando Smoke Tests en QA..."
+                sleep 30
+                BACKEND_URL="https://coffeehub-back-qa-argeftdrb3dkb9du.brazilsouth-01.azurewebsites.net"
+                
+                echo "Testing /api/health..."
+                response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/health")
+                if [ $response -eq 200 ]; then
+                  echo "✅ Health check passed!"
+                else
+                  echo "❌ Health check failed! Status: $response"
+                  exit 1
+                fi
+                
+                echo "Testing /api/products..."
+                response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/products")
+                if [ $response -eq 200 ]; then
+                  echo "✅ Products endpoint passed!"
+                else
+                  echo "❌ Products endpoint failed! Status: $response"
+                  exit 1
+                fi
+              displayName: '🔍 Smoke Tests QA'
+              continueOnError: false
 
-# -------------------- STAGE 3: DEPLOY PROD --------------------
+
+# ==================== STAGE 3: DEPLOY PROD ====================
 - stage: Deploy_PROD
-  displayName: "CD: Desplegar Producción + Configurar Entorno"
+  displayName: "CD: Desplegar Producción + Verificación"
   dependsOn: Deploy_QA
   condition: succeeded()
   jobs:
@@ -162,14 +235,14 @@ stages:
       runOnce:
         deploy:
           steps:
-            # ---- Backend ----
+            # ---- Backend PROD ----
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'backend-code'
                 path: '$(Pipeline.Workspace)/backend-source'
 
             - task: AzureWebApp@1
-              displayName: "Deploy Backend PROD"
+              displayName: "🚀 Deploy Backend PROD"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(backendAppNameProd)'
@@ -177,9 +250,9 @@ stages:
                 runtimeStack: 'NODE|18-lts'
                 startUpCommand: 'npm install && npm start'
 
-            # ---- Configurar MongoDB PROD en Backend ----
+            # ---- Configurar MongoDB PROD ----
             - task: AzureCLI@2
-              displayName: 'Configurar MONGODB_URI_PROD en Backend PROD'
+              displayName: '⚙️ Configurar MONGODB_URI_PROD en Backend'
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 scriptType: 'bash'
@@ -188,7 +261,6 @@ stages:
                   BACKEND_APP='$(backendAppNameProd)'
                   RG='$(RESOURCE_GROUP_NAME)'
                   echo "➡️ Configurando MongoDB PROD en $BACKEND_APP"
-                  echo "MongoDB URI PROD: $(MONGODB_URI_PROD)"  # Debug line
                   az webapp config appsettings set \
                     --name "$BACKEND_APP" \
                     --resource-group "$RG" \
@@ -196,14 +268,14 @@ stages:
                       MONGODB_URI="$(MONGODB_URI_PROD)" \
                       NODE_ENV="production"
 
-            # ---- Frontend ----
+            # ---- Frontend PROD ----
             - task: DownloadPipelineArtifact@2
               inputs:
                 artifact: 'frontend-code'
                 path: '$(Pipeline.Workspace)/frontend-source'
 
             - task: AzureWebApp@1
-              displayName: "Deploy Frontend PROD"
+              displayName: "🚀 Deploy Frontend PROD"
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 appName: '$(frontendAppNameProd)'
@@ -211,9 +283,9 @@ stages:
                 runtimeStack: 'NODE|18-lts'
                 startUpCommand: 'npm install && npm start'
 
-            # ---- Configuración PROD ----
+            # ---- Configurar Frontend PROD ----
             - task: AzureCLI@2
-              displayName: 'Configurar BACKEND_URL en Frontend PROD'
+              displayName: '⚙️ Configurar BACKEND_URL en Frontend PROD'
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 scriptType: 'bash'
@@ -228,8 +300,9 @@ stages:
                     --resource-group "$RG" \
                     --settings BACKEND_URL="$BACKEND_URL_VAL"
 
+            # ---- Configurar CORS PROD ----
             - task: AzureCLI@2
-              displayName: 'Configurar CORS en Backend PROD'
+              displayName: '⚙️ Configurar CORS en Backend PROD'
               inputs:
                 azureSubscription: '$(azureServiceConnection)'
                 scriptType: 'bash'
@@ -243,3 +316,31 @@ stages:
                     --name "$BACKEND_APP" \
                     --resource-group "$RG" \
                     --allowed-origins "$FRONTEND_URL_VAL"
+
+            # ---- Smoke Tests PROD ----
+            - script: |
+                echo "🔍 Ejecutando Smoke Tests en PROD..."
+                sleep 30
+                BACKEND_URL="https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net"
+                
+                echo "Testing /api/health..."
+                response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/health")
+                if [ $response -eq 200 ]; then
+                  echo "✅ Health check passed!"
+                else
+                  echo "❌ Health check failed! Status: $response"
+                  exit 1
+                fi
+                
+                echo "Testing /api/products..."
+                response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/products")
+                if [ $response -eq 200 ]; then
+                  echo "✅ Products endpoint passed!"
+                else
+                  echo "❌ Products endpoint failed! Status: $response"
+                  exit 1
+                fi
+                
+                echo "🎉 Deployment a PROD completado exitosamente!"
+              displayName: '🔍 Smoke Tests PROD'
+              continueOnError: false
