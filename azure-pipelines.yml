@@ -87,19 +87,41 @@ stages:
         displayName: '📦 Instalar Dependencias Frontend'
         workingDirectory: 'coffehub/frontend'
 
-      #---- Tests del Frontend (si los tienes) ----
+      # ---- Tests del Frontend ----
       - script: |
-           echo "🧪 Ejecutando tests del frontend..."
-           npm test
-           displayName: '🧪 Tests Frontend'
-           workingDirectory: 'coffehub/frontend'
-           continueOnError: false
+          echo "🧪 Ejecutando tests del frontend..."
+          npm run test:ci
+        displayName: '🧪 Tests Frontend'
+        workingDirectory: 'coffehub/frontend'
+        continueOnError: false
+
+      # ---- Publicar Resultados de Tests Frontend ----
+      - task: PublishTestResults@2
+        displayName: '📋 Publicar Resultados Tests Frontend'
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '**/junit.xml'
+          searchFolder: 'coffehub/frontend'
+          mergeTestResults: true
+          failTaskOnFailedTests: true
+          testRunTitle: 'Frontend Tests'
+        condition: succeededOrFailed()
+
+      # ---- Publicar Coverage Frontend ----
+      - task: PublishCodeCoverageResults@1
+        displayName: '📊 Publicar Code Coverage Frontend'
+        inputs:
+          codeCoverageTool: 'Cobertura'
+          summaryFileLocation: 'coffehub/frontend/coverage/cobertura-coverage.xml'
+          reportDirectory: 'coffehub/frontend/coverage'
+        condition: succeededOrFailed()
 
       - task: PublishPipelineArtifact@1
         inputs:
           targetPath: 'coffehub/frontend'
           artifact: 'frontend-code'
         displayName: "📦 Publicar Código Frontend"
+        condition: succeeded()
 
 
 # ==================== STAGE 2: DEPLOY QA ====================
