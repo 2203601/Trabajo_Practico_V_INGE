@@ -87,13 +87,13 @@ stages:
         displayName: '📦 Instalar Dependencias Frontend'
         workingDirectory: 'coffehub/frontend'
 
-      # ---- Tests del Frontend (si los tienes) ----
-      # - script: |
-      #     echo "🧪 Ejecutando tests del frontend..."
-      #     npm test
-      #   displayName: '🧪 Tests Frontend'
-      #   workingDirectory: 'coffehub/frontend'
-      #   continueOnError: false
+      #---- Tests del Frontend (si los tienes) ----
+      - script: |
+           echo "🧪 Ejecutando tests del frontend..."
+           npm test
+           displayName: '🧪 Tests Frontend'
+           workingDirectory: 'coffehub/frontend'
+           continueOnError: false
 
       - task: PublishPipelineArtifact@1
         inputs:
