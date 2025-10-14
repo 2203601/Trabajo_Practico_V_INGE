@@ -10,7 +10,7 @@
     "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/unit",
     "test:mocked": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/unit-mocked",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/integration",
-    "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --ci --coverage --maxWorkers=2"},
+"test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --ci --coverage --maxWorkers=2 --coverageThreshold='{}'"  },
   "dependencies": {
     "express": "^5.1.0"
   },
