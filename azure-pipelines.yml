@@ -290,6 +290,23 @@ stages:
                       MONGODB_URI="$(MONGODB_URI_PROD)" \
                       NODE_ENV="production"
 
+            # ---- Configurar CORS PROD PRIMERO ----
+            - task: AzureCLI@2
+              displayName: '⚙️ Configurar CORS en Backend PROD (ANTES de smoke tests)'
+              inputs:
+                azureSubscription: '$(azureServiceConnection)'
+                scriptType: 'bash'
+                scriptLocation: 'inlineScript'
+                inlineScript: |
+                  FRONTEND_URL_VAL="https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net"
+                  BACKEND_APP='$(backendAppNameProd)'
+                  RG='$(RESOURCE_GROUP_NAME)'
+                  echo "➡️ Configurando CORS en $BACKEND_APP"
+                  az webapp cors add \
+                    --name "$BACKEND_APP" \
+                    --resource-group "$RG" \
+                    --allowed-origins "$FRONTEND_URL_VAL"
+
             # ---- Frontend PROD ----
             - task: DownloadPipelineArtifact@2
               inputs:
@@ -322,47 +339,57 @@ stages:
                     --resource-group "$RG" \
                     --settings BACKEND_URL="$BACKEND_URL_VAL"
 
-            # ---- Configurar CORS PROD ----
-            - task: AzureCLI@2
-              displayName: '⚙️ Configurar CORS en Backend PROD'
-              inputs:
-                azureSubscription: '$(azureServiceConnection)'
-                scriptType: 'bash'
-                scriptLocation: 'inlineScript'
-                inlineScript: |
-                  FRONTEND_URL_VAL="https://coffeehub-front-prod-hgh2ehb7bzchh4ft.brazilsouth-01.azurewebsites.net"
-                  BACKEND_APP='$(backendAppNameProd)'
-                  RG='$(RESOURCE_GROUP_NAME)'
-                  echo "➡️ Configurando CORS en $BACKEND_APP"
-                  az webapp cors add \
-                    --name "$BACKEND_APP" \
-                    --resource-group "$RG" \
-                    --allowed-origins "$FRONTEND_URL_VAL"
-
-            # ---- Smoke Tests PROD ----
+            # ---- Smoke Tests PROD CON MÁS ESPERA Y MEJOR DEBUGGING ----
             - script: |
                 echo "🔍 Ejecutando Smoke Tests en PROD..."
-                sleep 30
+                sleep 60
                 BACKEND_URL="https://coffeehub-back-prod-bzgaa5ekbed7fret.brazilsouth-01.azurewebsites.net"
+                MAX_RETRIES=5
+                RETRY_COUNT=0
                 
                 echo "Testing /api/health..."
-                response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/health")
-                if [ $response -eq 200 ]; then
-                  echo "✅ Health check passed!"
-                else
-                  echo "❌ Health check failed! Status: $response"
+                while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                  echo "Intento $((RETRY_COUNT + 1))/$MAX_RETRIES..."
+                  response=$(curl -s -w "\n%{http_code}" "$BACKEND_URL/api/health")
+                  http_code=$(echo "$response" | tail -n1)
+                  body=$(echo "$response" | head -n-1)
+                  
+                  echo "Response Code: $http_code"
+                  echo "Response Body: $body"
+                  
+                  if [ "$http_code" -eq 200 ]; then
+                    echo "✅ Health check passed!"
+                    break
+                  else
+                    echo "⚠️ Status: $http_code"
+                    RETRY_COUNT=$((RETRY_COUNT + 1))
+                    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                      echo "Esperando 10 segundos antes de reintentar..."
+                      sleep 10
+                    fi
+                  fi
+                done
+                
+                if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                  echo "❌ Health check falló después de $MAX_RETRIES intentos"
                   exit 1
                 fi
                 
                 echo "Testing /api/products..."
-                response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/products")
-                if [ $response -eq 200 ]; then
+                response=$(curl -s -w "\n%{http_code}" "$BACKEND_URL/api/products")
+                http_code=$(echo "$response" | tail -n1)
+                body=$(echo "$response" | head -n-1)
+                
+                echo "Response Code: $http_code"
+                echo "Response Body: $body"
+                
+                if [ "$http_code" -eq 200 ]; then
                   echo "✅ Products endpoint passed!"
                 else
-                  echo "❌ Products endpoint failed! Status: $response"
+                  echo "❌ Products endpoint failed! Status: $http_code"
                   exit 1
                 fi
                 
                 echo "🎉 Deployment a PROD completado exitosamente!"
-              displayName: '🔍 Smoke Tests PROD'
+              displayName: '🔍 Smoke Tests PROD (Con Retry)'
               continueOnError: false
